@@ -13,20 +13,22 @@ Duration (frames)
 """
 
 class MarkerList:
+	"""A list of markers (do I need this really?)"""
 	pass
 
 class MarkerColor(enum.Enum):
 	"""Avid marker colors"""
-	RED = "red"
-	GREEN = "green"
-	BLUE = "blue"
-	CYAN = "cyan"
+	RED     = "red"
+	GREEN   = "green"
+	BLUE    = "blue"
+	CYAN    = "cyan"
 	MAGENTA = "magenta"
-	YELLOW = "yellow"
-	BLACK = "black"
-	WHITE = "white"
+	YELLOW  = "yellow"
+	BLACK   = "black"
+	WHITE   = "white"
 
 class Marker:
+	"""An Avid Marker/Locator"""
 
 	_pat_bad_chars = re.compile("[\n\t]")
 
