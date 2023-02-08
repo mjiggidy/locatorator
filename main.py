@@ -124,9 +124,10 @@ def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
 		except Exception as e:
 			raise ValueError(f"Cannot parse marker on line {idx+1}: {e}")
 
-		# Filter only blue markers
-		if marker.color != MarkerColors.BLUE:
-			continue
+		# TODO: Add filtering? Ex: Filter only blue markers
+		# if marker.color != MarkerColors.BLUE:
+		#	continue
+
 		markers.append(marker)
 	
 	return markers
@@ -222,12 +223,21 @@ def main() -> None:
 	# Pair markers together by comment (shot id)
 	markers_changes = build_marker_changes(markers_old, markers_new)
 
+	if not markers_changes:
+		print("No changes were detected.")
+		return
+
 	# Write changes to new marker list
 	with open("changes.txt", "w") as file_output:
 		write_change_list(markers_changes, file_output)
 
 	print_change_list(markers_changes)
 
+	print("Marker list output to changes.txt")
+
 if __name__ == "__main__":
 
-	main()
+	try:
+		main()
+	except Exception as e:
+		sys.exit(e)
