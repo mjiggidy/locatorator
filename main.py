@@ -1,4 +1,4 @@
-import sys, typing, enum, re, copy
+import sys, typing, enum, re, copy, pathlib
 from posttools.timecode import Timecode, TimecodeRange
 
 """
@@ -16,7 +16,7 @@ class MarkerList:
 	"""A list of markers (do I need this really?)"""
 	pass
 
-class MarkerColor(enum.Enum):
+class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
 	RED     = "red"
 	GREEN   = "green"
@@ -32,12 +32,12 @@ class Marker:
 
 	_pat_bad_chars = re.compile("[\n\t]")
 
-	def __init__(self, *, name:str, tc_start:typing.Union[str,Timecode], track:str, color:typing.Union[str,MarkerColor], comment:str, duration:int):
+	def __init__(self, *, name:str, tc_start:typing.Union[str,Timecode], track:str, color:typing.Union[str,MarkerColors], comment:str, duration:int):
 
 		self._name    = self._sanitize_string(name)
 		self._tc      = TimecodeRange(start=Timecode(tc_start), duration=Timecode(duration))
 		self._track   = self._sanitize_string(track)
-		self._color   = MarkerColor(color)
+		self._color   = MarkerColors(color)
 		self._comment = self._sanitize_string(comment)
 	
 	@property
@@ -55,7 +55,7 @@ class Marker:
 		return self._track
 	
 	@property
-	def color(self) -> MarkerColor:
+	def color(self) -> MarkerColors:
 		return self._color
 	
 	@property
@@ -82,7 +82,7 @@ class Marker:
 			self.track,
 			self.color.value,
 			self.comment,
-			str(self.timecode.duration.frames)
+			str(self.timecode.duration.framenumber)
 		])
 
 	def __repr__(self) -> str:
@@ -103,7 +103,7 @@ class Marker:
 			return self.timecode.start < other
 
 	def __hash__(self) -> str:
-		return hash(self.name, self.timecode, self.comment)
+		return hash(self.name, self.track, self.timecode, self.comment)
 		
 	
 	@classmethod
@@ -114,17 +114,69 @@ class Marker:
 def main() -> None:
 	"""Markers"""
 
-	if len(sys.argv) < 2:
-		sys.exit(f"Usage: {__file__} markerlist.txt")
+	if len(sys.argv) < 3:
+		sys.exit(f"Usage: {__file__} markerlist.txt comparelist.txt")
 	
+	markers_orig = []
+	
+	path_orig = pathlib.Path(sys.argv[1])
+
+	# Get the first 'un as a list
 	with open(sys.argv[1]) as file_markers:
-
-		markers = []
-
 		for idx, line in enumerate(l.rstrip('\n') for l in file_markers.readlines()):
-			markers.append(Marker.from_string(line))
+			marker = Marker.from_string(line)
+			# Filter only blue markers
+			if marker.color != MarkerColors.BLUE:
+				continue
+			markers_orig.append(marker)
+	
+	# Sort markers by TC
+	markers_orig.sort()
+		
+	# Get the second 'un as a dict
+	markers_comp = {}
+	with open(sys.argv[2]) as file_compare:
 
-			print(sorted(markers))
+		for idx, line in enumerate(l.rstrip('\n') for l in file_compare.readlines()):
+			marker = Marker.from_string(line)
+			if marker.color != MarkerColors.BLUE:
+				continue
+			elif marker.comment in markers_comp:
+				print("Uh..")
+				exit
+			markers_comp[marker.comment] = marker
+	
+	# Build tuplet
+	markers = []
+	change_list = []
+	for marker in markers_orig:
+		if marker.comment in markers_comp:
+			marker_comp = markers_comp[marker.comment]
+			markers.append((marker, marker_comp))
+	print("")
+	print("Shot ID                  Old Version      New Version   Offset since last change")
+	print("---------------------    -----------      -----------   ------------------------")
+	
+	running_offset = Timecode(0)
+	for orig, comp in markers:
+		offset = comp.timecode.start - orig.timecode.start
+		if offset != running_offset:
+			print("Cut change at ", orig.comment,": ", orig.timecode.start, " -> ", comp.timecode.start, " (", str(offset - running_offset).rjust(12), ")")
+			change_list.append(Marker(
+				name="Locatorator",
+				tc_start=str(comp.timecode.start),
+				track="TC1",
+				color=MarkerColors.WHITE.value,
+				comment=f"Cut change: {(offset-running_offset).framenumber} frames since {path_orig.stem}",
+				duration=1
+			))
+			running_offset = offset
+
+	print("")
+
+	with open("output.txt","w") as file_output:
+		for marker in change_list:
+			print(marker, file=file_output)
 
 if __name__ == "__main__":
 
