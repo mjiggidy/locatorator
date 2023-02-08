@@ -1,21 +1,6 @@
 import sys, typing, enum, re, copy, pathlib
 from posttools.timecode import Timecode, TimecodeRange
 
-"""
-Fields:
-
-name
-Start TC
-Track
-Color
-Comment
-Duration (frames)
-"""
-
-class MarkerList:
-	"""A list of markers (do I need this really?)"""
-	pass
-
 class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
 	RED     = "red"
@@ -52,20 +37,37 @@ class Marker:
 	
 	@property
 	def track(self) -> str:
+		"""The track on which this marker is set"""
 		return self._track
 	
 	@property
 	def color(self) -> MarkerColors:
+		"""The marker color"""
 		return self._color
 	
 	@property
 	def comment(self) -> str:
+		"""The marker comment"""
 		return self._comment
+	
+	@property
+	def is_spanned(self) -> bool:
+		"""Is this a spanned marker"""
+		return self.timecode.duration.framenumber > 1
 		
 	@classmethod
 	def from_string(cls, line:str) -> "Marker":
 		"""Create a marker from a line in a marker list"""
 		m = line.split('\t')
+		"""
+		Fields:
+		name
+		Start TC
+		Track
+		Color
+		Comment
+		Duration (frames)
+		"""
 		return cls(
 			name = m[0],
 			tc_start = m[1],
@@ -111,72 +113,120 @@ class Marker:
 		"""Don't try anything silly"""
 		return cls._pat_bad_chars.sub("",text).strip()
 
+def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
+	"""Parse a marker list from a file pointer"""
+
+	markers = []
+
+	for idx, line in enumerate(l.rstrip('\n') for l in file_input.readlines()):
+		try:
+			marker = Marker.from_string(line)
+		except Exception as e:
+			raise ValueError(f"Cannot parse marker on line {idx+1}: {e}")
+
+		# Filter only blue markers
+		if marker.color != MarkerColors.BLUE:
+			continue
+		markers.append(marker)
+	
+	return markers
+
+def build_marker_lookup(marker_list:typing.Iterable[Marker]) -> dict[str, Marker]:
+	"""Build a dict based on marker comments"""
+
+	marker_lookup = {}
+	for marker in marker_list:
+		# TODO: Think about shot IDs occurring more than once in a list
+		if marker.comment in marker_lookup:
+			raise ValueError(f"Shot ID \"{marker.comment}\" was found more than once")
+		marker_lookup[marker.comment.lower()] = marker
+	
+	return marker_lookup
+
+def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing.Iterable[Marker]) -> typing.List[typing.Tuple[Marker, str]]:
+	"""Build matches of old and new markers"""
+
+	# TODO: This still feels like it's doing too much
+
+	marker_lookup = build_marker_lookup(markers_old)
+
+	running_offset = Timecode(0)
+	marker_pairs = []
+
+	for marker_new in markers_new:
+
+		marker_old = marker_lookup.get(marker_new.comment.lower())
+		local_offset = marker_new.timecode.start - marker_old.timecode.start if marker_old else 0
+		adjusted_offset = local_offset-running_offset
+		
+		if marker_old is None:
+			change_details = f"New shot ID added: {marker_new.comment} at {marker_new.timecode.start}"
+
+		elif adjusted_offset != 0:
+			change_details = f"Cut change at {marker_old.comment}: {marker_old.timecode.start} -> {marker_new.timecode.start}   {'' if adjusted_offset < Timecode(0) else '+'}{adjusted_offset}"
+			running_offset = local_offset
+
+
+		else:
+			continue
+
+		marker_pairs.append(
+			(marker_new, change_details,)
+		)
+	
+	return marker_pairs
+
+def write_change_list(markers_changes:typing.Iterable[typing.Tuple[Marker,str]], file_output:typing.TextIO, marker_name="Locatorator", marker_track:str="TC1", marker_color:MarkerColors=MarkerColors.WHITE):
+	"""Write changes to a new marker list"""
+
+	for marker, comment in markers_changes:
+		print(
+			Marker(
+				name=marker_name,
+				tc_start = str(marker.timecode.start),
+				track=marker_track,
+				color=marker_color,
+				comment=comment,
+				duration=1
+			),
+			file=file_output
+		)
+	
+def print_change_list(markers_changes) -> None:
+	"""Print changes to screen"""
+
+	print("")
+	print("Shot ID               Old Version    New Version   Offset since last change")
+	print("--------------------- -----------    -----------   ------------------------")
+
+	for _, comment in markers_changes:
+		print(comment)
+	
+	print("")
+
 def main() -> None:
 	"""Markers"""
 
 	if len(sys.argv) < 3:
 		sys.exit(f"Usage: {__file__} markerlist.txt comparelist.txt")
-	
-	markers_orig = []
-	
-	path_orig = pathlib.Path(sys.argv[1])
 
-	# Get the first 'un as a list
+	# Load in the marker lists
 	with open(sys.argv[1]) as file_markers:
-		for idx, line in enumerate(l.rstrip('\n') for l in file_markers.readlines()):
-			marker = Marker.from_string(line)
-			# Filter only blue markers
-			if marker.color != MarkerColors.BLUE:
-				continue
-			markers_orig.append(marker)
-	
-	# Sort markers by TC
-	markers_orig.sort()
+		markers_old = get_marker_list_from_file(file_markers)
+	markers_old.sort(key=lambda x:x.timecode.start)
 		
-	# Get the second 'un as a dict
-	markers_comp = {}
-	with open(sys.argv[2]) as file_compare:
-
-		for idx, line in enumerate(l.rstrip('\n') for l in file_compare.readlines()):
-			marker = Marker.from_string(line)
-			if marker.color != MarkerColors.BLUE:
-				continue
-			elif marker.comment in markers_comp:
-				print("Uh..")
-				exit
-			markers_comp[marker.comment] = marker
+	with open(sys.argv[2]) as file_markers:
+		markers_new = get_marker_list_from_file(file_markers)
+	markers_new.sort(key=lambda x:x.timecode.start)
 	
-	# Build tuplet
-	markers = []
-	change_list = []
-	for marker in markers_orig:
-		if marker.comment in markers_comp:
-			marker_comp = markers_comp[marker.comment]
-			markers.append((marker, marker_comp))
-	print("")
-	print("Shot ID                  Old Version      New Version   Offset since last change")
-	print("---------------------    -----------      -----------   ------------------------")
-	
-	running_offset = Timecode(0)
-	for orig, comp in markers:
-		offset = comp.timecode.start - orig.timecode.start
-		if offset != running_offset:
-			print("Cut change at ", orig.comment,": ", orig.timecode.start, " -> ", comp.timecode.start, " (", str(offset - running_offset).rjust(12), ")")
-			change_list.append(Marker(
-				name="Locatorator",
-				tc_start=str(comp.timecode.start),
-				track="TC1",
-				color=MarkerColors.WHITE.value,
-				comment=f"Cut change: {(offset-running_offset).framenumber} frames since {path_orig.stem}",
-				duration=1
-			))
-			running_offset = offset
+	# Pair markers together by comment (shot id)
+	markers_changes = build_marker_changes(markers_old, markers_new)
 
-	print("")
+	# Write changes to new marker list
+	with open("changes.txt", "w") as file_output:
+		write_change_list(markers_changes, file_output)
 
-	with open("output.txt","w") as file_output:
-		for marker in change_list:
-			print(marker, file=file_output)
+	print_change_list(markers_changes)
 
 if __name__ == "__main__":
 
