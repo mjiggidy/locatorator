@@ -209,7 +209,7 @@ def main() -> None:
 	"""Markers"""
 
 	if len(sys.argv) < 3:
-		sys.exit(f"Usage: {__file__} markerlist.txt comparelist.txt")
+		sys.exit(f"Usage: {__package__} markerlist.txt comparelist.txt")
 
 	# Load in the marker lists
 	with open(sys.argv[1]) as file_markers:
@@ -235,9 +235,14 @@ def main() -> None:
 
 	print("Marker list output to changes.txt")
 
-if __name__ == "__main__":
+def bootstrap():
+	"""Entrypoint via setup.py `entry_point`"""
 
 	try:
 		main()
 	except Exception as e:
 		sys.exit(e)
+
+if __name__ == "__main__":
+
+	bootstrap()
