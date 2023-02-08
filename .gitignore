@@ -4,6 +4,12 @@ include/
 lib/
 pyvenv.cfg
 
+# testing
+examples/
+changes.txt
+
+.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
