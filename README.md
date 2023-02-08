@@ -25,7 +25,9 @@ New marker list imported into Avid:
 Once installed, `locatorator` can be used in the following way:
 
 - Export a marker list from the old version of your sequence.
+  - Note: The marker list should only contain markers you'd like to compare
 - Export a marker list from the new version of your sequence.
+  - Note: The marker list should only contain markers you'd like to compare
 - Run locatorator with the following syntax:
   ```python
   locatorator old_sequence_markerlist.txt new_sequence_markerlist.txt
