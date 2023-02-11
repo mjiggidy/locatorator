@@ -1,4 +1,5 @@
 from PySide6 import QtWidgets, QtCore, QtGui
+from posttools import timecode
 import sys, pathlib, typing
 import locatorator
 
@@ -7,20 +8,65 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 	def __init__(self):
 		super().__init__()
 
+		self._headerlabels=[
+			"Shot ID",
+			"Old TC",
+			"New TC",
+			"Offset"
+		]
+
 		self._setup()
 	
 	def _setup(self):
 
-		self.setHeaderLabels(
-			[
-				"Shot ID",
-				"Old TC",
-				"New TC",
-				"Offset"
-			]
-		)
+		self.setHeaderLabels(self._headerlabels)
 		self.setAlternatingRowColors(True)
 		self.setSortingEnabled(True)
+	
+	def set_changelist(self, markers_changes:typing.Iterable[typing.Tuple[locatorator.Marker, locatorator.Marker, timecode.Timecode]]) -> None:
+
+		self.clear()
+
+		changelist = []
+
+		for marker_old, marker_new, relative_offset in markers_changes:
+
+			marker_comment = marker_old.comment if marker_old else marker_new.comment
+			tc_old = str(marker_old.timecode.start) if marker_old else ""
+			tc_new = str(marker_new.timecode.start) if marker_new else ""
+			change = ""
+			
+			if marker_old and marker_new:
+				change = str(relative_offset)
+				if relative_offset > 0:
+					change = "+" + change
+			
+			elif marker_old:
+				change = "Shot Removed"
+			
+			else:
+				change = "Shot Added"
+
+			changelist_item = QtWidgets.QTreeWidgetItem([
+				marker_comment,
+				tc_old,
+				tc_new,
+				change				
+			])
+
+			for idx, header in enumerate(self._headerlabels):
+				if header != "Shot ID":
+					changelist_item.setTextAlignment(idx, QtCore.Qt.AlignmentFlag.AlignRight)
+			
+			changelist.append(changelist_item)
+
+		self.addTopLevelItems(changelist)
+		
+		for idx, header in enumerate(self._headerlabels):
+			if header != "Shot ID":
+				self.resizeColumnToContents(idx)
+
+		self.sortByColumn(self._headerlabels.index("New TC"), QtCore.Qt.SortOrder.AscendingOrder)
 
 class InputFileChooser(QtWidgets.QWidget):
 
@@ -153,16 +199,9 @@ class MainWidget(QtWidgets.QWidget):
 		with self._path_new.open() as file_new:
 			markers_new = locatorator.get_marker_list_from_file(file_new)
 		
-		changes = locatorator.build_marker_changes(markers_old, markers_new)
+		markers_changes = locatorator.build_marker_changes(markers_old, markers_new)
 
-		for marker_old, marker_new, _ in changes:
-
-			self._tree_viewer.addTopLevelItem(QtWidgets.QTreeWidgetItem([
-				marker_new.comment,
-				str(marker_old.timecode.start),
-				str(marker_new.timecode.start),
-				str(marker_new.timecode.start-marker_old.timecode.start)
-			]))
+		self._tree_viewer.set_changelist(markers_changes)
 	
 class MainWindow(QtWidgets.QMainWindow):
 	 

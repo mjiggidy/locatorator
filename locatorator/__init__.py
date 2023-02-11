@@ -144,7 +144,7 @@ def build_marker_lookup(marker_list:typing.Iterable[Marker]) -> dict[str, Marker
 	
 	return marker_lookup
 
-def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing.Iterable[Marker]) -> typing.List[typing.Tuple[Marker, Marker, str]]:
+def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing.Iterable[Marker]) -> typing.List[typing.Tuple[Marker, Marker, Timecode]]:
 	"""Build matches of old and new markers"""
 
 	# TODO: This still feels like it's doing too much
@@ -172,7 +172,7 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 			continue
 
 		marker_pairs.append(
-			(marker_old, marker_new, change_details,)
+			(marker_old, marker_new, adjusted_offset,)
 		)
 	
 	return marker_pairs
