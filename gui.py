@@ -40,10 +40,10 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 			painter = QtGui.QPainter(pm)
 			color   = QtGui.QColor(marker_color)
 			painter.setBrush(QtGui.QBrush(color))
-			painter.drawEllipse(pm.width()/2-10, 0, pm.width()/4, pm.height())
+			painter.drawEllipse(0, 0, pm.width(), pm.height())
 			painter.end()
 
-			self._icons[marker_color] = pm
+			self._icons[marker_color] = QtGui.QIcon(pm.scaledToHeight(6, QtCore.Qt.TransformationMode.SmoothTransformation))
 
 
 	def set_changelist(self, markers_changes:typing.Iterable[typing.Tuple[locatorator.Marker, locatorator.Marker, timecode.Timecode]]) -> None:
@@ -79,7 +79,7 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 
 			for idx, header in enumerate(self._headerlabels):
 				if header != MARKER_COMMENT_COLUMN_NAME:
-					changelist_item.setTextAlignment(idx, QtCore.Qt.AlignmentFlag.AlignRight)
+					changelist_item.setTextAlignment(idx, QtCore.Qt.AlignmentFlag.AlignRight|QtCore.Qt.AlignmentFlag.AlignCenter)
 			
 			changelist_item.setIcon(0, self._icons.get(marker_new.color.name.lower() if marker_new else marker_old.name.lower(), "red"))
 			
@@ -239,7 +239,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 		self.setCentralWidget(self.wdg_main)
 		self.setWindowTitle("Locatorator")
-		self.setMinimumWidth(500)
+		self.setMinimumWidth(450)
 
 def main():
 	app = QtWidgets.QApplication(sys.argv)
