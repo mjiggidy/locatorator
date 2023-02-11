@@ -3,26 +3,49 @@ from posttools import timecode
 import sys, pathlib, typing
 import locatorator
 
+MARKER_COMMENT_COLUMN_NAME = "Shot ID"
+
 class MarkerViewer(QtWidgets.QTreeWidget):
 
 	def __init__(self):
 		super().__init__()
 
 		self._headerlabels=[
-			"Shot ID",
+			MARKER_COMMENT_COLUMN_NAME,
 			"Old TC",
 			"New TC",
 			"Offset"
 		]
 
+		self._icons = {}
+
 		self._setup()
 	
 	def _setup(self):
 
+		self._prepare_icons()
+		self.setIndentation(0)
 		self.setHeaderLabels(self._headerlabels)
 		self.setAlternatingRowColors(True)
+		self.setUniformRowHeights(True)
 		self.setSortingEnabled(True)
 	
+	def _prepare_icons(self):
+		"""Draw marker icons"""
+
+		for marker_color in (m.lower() for m in locatorator.MarkerColors._member_names_):
+			pm = QtGui.QPixmap(64, 64)
+			pm.fill(QtGui.QColor(0,0,0,0))
+
+			painter = QtGui.QPainter(pm)
+			color   = QtGui.QColor(marker_color)
+			painter.setBrush(QtGui.QBrush(color))
+			painter.drawEllipse(pm.width()/2-10, 0, pm.width()/4, pm.height())
+			painter.end()
+
+			self._icons[marker_color] = pm
+
+
 	def set_changelist(self, markers_changes:typing.Iterable[typing.Tuple[locatorator.Marker, locatorator.Marker, timecode.Timecode]]) -> None:
 
 		self.clear()
@@ -55,15 +78,17 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 			])
 
 			for idx, header in enumerate(self._headerlabels):
-				if header != "Shot ID":
+				if header != MARKER_COMMENT_COLUMN_NAME:
 					changelist_item.setTextAlignment(idx, QtCore.Qt.AlignmentFlag.AlignRight)
+			
+			changelist_item.setIcon(0, self._icons.get(marker_new.color.name.lower() if marker_new else marker_old.name.lower(), "red"))
 			
 			changelist.append(changelist_item)
 
 		self.addTopLevelItems(changelist)
 		
 		for idx, header in enumerate(self._headerlabels):
-			if header != "Shot ID":
+			if header != MARKER_COMMENT_COLUMN_NAME:
 				self.resizeColumnToContents(idx)
 
 		self.sortByColumn(self._headerlabels.index("New TC"), QtCore.Qt.SortOrder.AscendingOrder)
@@ -162,9 +187,6 @@ class InputListGroup(QtWidgets.QGroupBox):
 		path_new = self._input_new_markers.get_specified_path()
 		self._btn_compare.setEnabled(bool(path_old and path_new))
 
-
-
-
 class MainWidget(QtWidgets.QWidget):
 
 	def __init__(self):
@@ -218,8 +240,6 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.setCentralWidget(self.wdg_main)
 		self.setWindowTitle("Locatorator")
 		self.setMinimumWidth(500)
-
-
 
 def main():
 	app = QtWidgets.QApplication(sys.argv)
