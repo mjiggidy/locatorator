@@ -31,6 +31,8 @@ class MarkerIcons:
 
 class MarkerViewer(QtWidgets.QTreeWidget):
 
+	sig_changes_ready = QtCore.Signal()
+
 	def __init__(self):
 		super().__init__()
 
@@ -98,10 +100,16 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 
 		self.sortByColumn(self._headerlabels.index("New TC"), QtCore.Qt.SortOrder.AscendingOrder)
 
+		self.sig_changes_ready.emit()
+
 class OutputFileGroup(QtWidgets.QGroupBox):
+	"""Marker list export groupbox"""
 
 	sig_export_requested = QtCore.Signal(str, locatorator.MarkerColors, str, str)
+	"""User has requested an export"""
+
 	sig_export_canceled = QtCore.Signal()
+	"""Export did not complete"""
 	sig_export_complete = QtCore.Signal(str)
 
 	def __init__(self):
@@ -121,22 +129,30 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 		
 		for color in MarkerIcons.icons:
 			self._cmb_color.addItem(MarkerIcons.icons.get(color),"",color)
-		
 		# TODO: Oh boy test this
 		self._cmb_color.setCurrentIndex(list(MarkerIcons.icons.keys()).index(EXPORT_DEFAULT_MARKER_COLOR))
+		self._cmb_color.setToolTip("Exported Marker Color")
 		self.layout().addWidget(self._cmb_color)
 
 		for track in EXPORT_TRACK_OPTIONS:
 			self._cmb_track.addItem(track)
+		self._cmb_track.setToolTip("Track for Exported Markers")
 		self.layout().addWidget(self._cmb_track)
 
 		self._txt_name.setText(EXPORT_DEFAULT_MARKER_NAME)
+		self._txt_name.setToolTip("Name of Exported Markers")
 		self.layout().addWidget(self._txt_name)
 
 		self._btn_export.setText("Export Marker List...") 
+		self._btn_export.setEnabled(False)
 		self.layout().addWidget(self._btn_export)
 
 		self._btn_export.clicked.connect(self._export_markers)
+
+	@QtCore.Slot()
+	def allow_export(self, allowed:bool):
+		"""Allow us to do our thang here"""
+		self._btn_export.setEnabled(allowed)
 	
 	@QtCore.Slot()
 	def _export_markers(self, markers:typing.Iterable[locatorator.Marker]) -> None:
@@ -246,9 +262,14 @@ class InputListGroup(QtWidgets.QGroupBox):
 
 class MainWidget(QtWidgets.QWidget):
 
+	sig_changes_ready   = QtCore.Signal()
+	sig_changes_cleared = QtCore.Signal()
+
 	def __init__(self):
 		super().__init__()
 		self._prep_marker_icons()
+
+		self._changes_loaded = False
 
 		self._layout = QtWidgets.QVBoxLayout()
 		self._grp_list_inputs = InputListGroup()
@@ -264,19 +285,33 @@ class MainWidget(QtWidgets.QWidget):
 		self._setup()
 	
 	def _setup(self):
-
-
 		self.setLayout(self._layout)
 		self.layout().addWidget(self._grp_list_inputs)
 		self.layout().addWidget(self._tree_viewer)
 		self.layout().addWidget(self._exporter)
 
 		self._grp_list_inputs.sig_paths_chosen.connect(self._set_paths)
-
+		
+		#self._tree_viewer.sig_changes_ready.connect(self.sig_changes_ready)
+		self.sig_changes_ready.connect(self._validate_changes)
+		self.sig_changes_cleared.connect(lambda:self._exporter.allow_export.emit(False))
+		
 		self._exporter.sig_export_requested.connect(self._save_marker_list)
 	
 	@QtCore.Slot()
+	def _validate_changes(self):
+		"""Marker lists have successfully loaded"""
+		
+		# Ensure at least one change has a non-zero delta or "Shot Added/Removed" message
+		self._exporter.allow_export(
+			any(m[2] for m in self._markerlist)
+		)
+
+		self._changes_loaded = True
+	
+	@QtCore.Slot()
 	def _save_marker_list(self, path_output:str, marker_color:locatorator.MarkerColors=locatorator.MarkerColors.WHITE, marker_track:str="TC1", marker_name:str=EXPORT_DEFAULT_MARKER_NAME):
+		"""Export a marker change list"""
 
 		with open(path_output, "w") as file_output:
 			for marker_old, marker_new, tc_delta in self._markerlist:
@@ -310,6 +345,11 @@ class MainWidget(QtWidgets.QWidget):
 		
 	
 	def _set_paths(self, path_old:str, path_new:str):
+		"""Update the program paths and run the comparison"""
+		# TODO: Split this out?
+
+		# Clear out the marker list model
+		self._markerlist = []
 
 		self._path_old = pathlib.Path(path_old)
 		self._path_new = pathlib.Path(path_new)
@@ -323,6 +363,8 @@ class MainWidget(QtWidgets.QWidget):
 		self._markerlist = locatorator.build_marker_changes(markers_old, markers_new)
 
 		self._tree_viewer.set_changelist(self._markerlist)
+
+		self.sig_changes_ready.emit()
 	
 	def _prep_marker_icons(self):
 		"""Prepare marker icons based on Marker Colors"""
@@ -330,7 +372,8 @@ class MainWidget(QtWidgets.QWidget):
 			MarkerIcons.prepare_icon(marker_color)
 	
 class MainWindow(QtWidgets.QMainWindow):
-	 
+	"""Main Program Window"""
+
 	def __init__(self):
 		super().__init__()
 
@@ -345,7 +388,8 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.setWindowTitle("Locatorator")
 		self.setMinimumWidth(450)
 
-def main():
+def main() -> int:
+	"""Launch the QApplication"""
 	app = QtWidgets.QApplication(sys.argv)
 
 	wnd_main = MainWindow()
