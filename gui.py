@@ -84,12 +84,14 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 				change				
 			])
 
+			# Align Timecodes right|cener
 			for idx, header in enumerate(self._headerlabels):
 				if header != MARKER_COMMENT_COLUMN_NAME:
 					changelist_item.setTextAlignment(idx, QtCore.Qt.AlignmentFlag.AlignRight|QtCore.Qt.AlignmentFlag.AlignCenter)
 			
+			# Set marker icon according to the color in the marker list
 			changelist_item.setIcon(0, MarkerIcons.icons.get(marker_new.color.name.lower() if marker_new else marker_old.name.lower(), "red"))
-			
+
 			changelist.append(changelist_item)
 
 		self.addTopLevelItems(changelist)
@@ -120,26 +122,29 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 		self._cmb_track = QtWidgets.QComboBox()
 		self._btn_export = QtWidgets.QPushButton()
 		self._txt_name = QtWidgets.QLineEdit()
+
+		self._settings = QtCore.QSettings()
 	
 		self._setup()
 
-	def _setup(self):
+	def _setup(self): 
 
 		self.setLayout(self._layout)
 		
 		for color in MarkerIcons.icons:
 			self._cmb_color.addItem(MarkerIcons.icons.get(color),"",color)
 		# TODO: Oh boy test this
-		self._cmb_color.setCurrentIndex(list(MarkerIcons.icons.keys()).index(EXPORT_DEFAULT_MARKER_COLOR))
+		self._cmb_color.setCurrentIndex(list(MarkerIcons.icons.keys()).index(str(self._settings.value("export/markercolor", EXPORT_DEFAULT_MARKER_COLOR))))
 		self._cmb_color.setToolTip("Exported Marker Color")
 		self.layout().addWidget(self._cmb_color)
 
-		for track in EXPORT_TRACK_OPTIONS:
-			self._cmb_track.addItem(track)
+		self._cmb_track.addItems(track for track in EXPORT_TRACK_OPTIONS)
+		self._cmb_track.setCurrentIndex(EXPORT_TRACK_OPTIONS.index(str(self._settings.value("export/markertrack",EXPORT_TRACK_OPTIONS[0]))))
 		self._cmb_track.setToolTip("Track for Exported Markers")
 		self.layout().addWidget(self._cmb_track)
 
-		self._txt_name.setText(EXPORT_DEFAULT_MARKER_NAME)
+		self._txt_name.setText(str(self._settings.value("export/markername", EXPORT_DEFAULT_MARKER_NAME)))
+		self._txt_name.setPlaceholderText(str(EXPORT_DEFAULT_MARKER_NAME))
 		self._txt_name.setToolTip("Name of Exported Markers")
 		self.layout().addWidget(self._txt_name)
 
@@ -147,6 +152,8 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 		self._btn_export.setEnabled(False)
 		self.layout().addWidget(self._btn_export)
 
+		self._cmb_color.currentIndexChanged.connect(lambda: self._settings.setValue("export/markercolor", self._cmb_color.currentData()))
+		self._cmb_track.currentTextChanged.connect(lambda trk: self._settings.setValue("export/markertrack", trk))
 		self._btn_export.clicked.connect(self._export_markers)
 
 	@QtCore.Slot()
@@ -178,6 +185,8 @@ class InputFileChooser(QtWidgets.QWidget):
 		self._txt_filepath = QtWidgets.QLineEdit()
 		self._btn_browse = QtWidgets.QPushButton(text="...")
 
+		self._start_folder_path = ""
+
 		self._setup()
 
 	def _setup(self):
@@ -206,12 +215,19 @@ class InputFileChooser(QtWidgets.QWidget):
 			if dropped_path.startswith("file://"):
 				dropped_path = dropped_path[len("file://"):]
 			self._txt_filepath.setText(str(pathlib.Path(dropped_path)))
+			self.set_start_folder_path(str(pathlib.Path(dropped_path))) # TODO:REDO
 		except:
 			pass
 	
+	def set_start_folder_path(self, path_default:str):
+		"""Set the initial path for the file browser dialog"""
+		self._start_folder_path = path_default
+	
 	def _set_specified_path_from_browser(self) -> None:
+		"""Open a file browser and set the path from a chosen file"""
 		self._txt_filepath.setFocus()
-		new_path = QtWidgets.QFileDialog.getOpenFileName(self, "Choose a marker list...", self.get_specified_path(), "Marker Lists (*.txt);;All Files (*)")[0]
+		new_path = QtWidgets.QFileDialog.getOpenFileName(self, "Choose a marker list...", self.get_specified_path() or self._start_folder_path, "Marker Lists (*.txt);;All Files (*)")[0]
+		self.set_start_folder_path(new_path)
 		self._txt_filepath.setText(new_path or self._txt_filepath.text())
 	
 	def get_specified_path(self) -> str:
@@ -230,11 +246,16 @@ class InputListGroup(QtWidgets.QGroupBox):
 		self._input_new_markers = InputFileChooser(label="New Markers:")
 		self._btn_compare = QtWidgets.QPushButton()
 
+		self._settings = QtCore.QSettings()
+
 		self._setup()
 
 	def _setup(self):
 
 		self.setLayout(self._layout)
+
+		self._input_old_markers.set_start_folder_path(self._settings.value("import/oldpath",""))
+		self._input_new_markers.set_start_folder_path(self._settings.value("import/newpath", ""))
 
 		self.layout().addWidget(self._input_old_markers)
 		self.layout().addWidget(self._input_new_markers)
@@ -259,6 +280,10 @@ class InputListGroup(QtWidgets.QGroupBox):
 		path_old = self._input_old_markers.get_specified_path()
 		path_new = self._input_new_markers.get_specified_path()
 		self._btn_compare.setEnabled(bool(path_old and path_new))
+
+		self._settings.setValue("import/oldpath",path_old)
+		self._settings.setValue("import/newpath",path_new)
+		
 
 class MainWidget(QtWidgets.QWidget):
 
@@ -390,7 +415,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def main() -> int:
 	"""Launch the QApplication"""
+	
 	app = QtWidgets.QApplication(sys.argv)
+	app.setOrganizationName("GlowingPixel")
+	app.setApplicationName("Locatorator")
 
 	wnd_main = MainWindow()
 	wnd_main.show()
