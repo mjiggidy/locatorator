@@ -40,7 +40,8 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 			MARKER_COMMENT_COLUMN_NAME,
 			"Old TC",
 			"New TC",
-			"Offset"
+			"TC Offset",
+			"Frame Offset"
 		]
 
 		self._setup()
@@ -49,6 +50,7 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 
 		self.setIndentation(0)
 		self.setHeaderLabels(self._headerlabels)
+		self.setColumnHidden(self._headerlabels.index("Frame Offset"), True)
 		self.setAlternatingRowColors(True)
 		self.setUniformRowHeights(True)
 		self.setSortingEnabled(True)
@@ -81,7 +83,8 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 				marker_comment,
 				tc_old,
 				tc_new,
-				change				
+				change,
+				str(int(relative_offset))
 			])
 
 			# Align Timecodes right|cener
@@ -103,6 +106,17 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 		self.sortByColumn(self._headerlabels.index("New TC"), QtCore.Qt.SortOrder.AscendingOrder)
 
 		self.sig_changes_ready.emit()
+	
+	def hide_non_changes(self, hidden:bool):
+		"""Filter"""
+
+		col_framechange = self._headerlabels.index("Frame Offset")
+		max_items = self.topLevelItemCount()
+
+		for item in (self.topLevelItem(x) for x in range(max_items)):
+			if item.text(col_framechange) == "0":
+				item.setHidden(hidden)
+
 
 class OutputFileGroup(QtWidgets.QGroupBox):
 	"""Marker list export groupbox"""
@@ -301,17 +315,25 @@ class MainWidget(QtWidgets.QWidget):
 		self._tree_viewer = MarkerViewer()
 		self._exporter = OutputFileGroup()
 
+		self._chk_show_hidden = QtWidgets.QCheckBox()
+
 		self._locked = False
 		self._path_old = pathlib.Path()
 		self._path_new = pathlib.Path()
 
 		self._markerlist = []
 
+		self._settings = QtCore.QSettings()
+
 		self._setup()
 	
 	def _setup(self):
 		self.setLayout(self._layout)
 		self.layout().addWidget(self._grp_list_inputs)
+		
+		self._chk_show_hidden.setText("Show Non-Changes")
+		self._chk_show_hidden.setCheckState(self._settings.value("viewer/showhidden",QtCore.Qt.CheckState.Unchecked))
+		self.layout().addWidget(self._chk_show_hidden)
 		self.layout().addWidget(self._tree_viewer)
 		self.layout().addWidget(self._exporter)
 
@@ -321,6 +343,8 @@ class MainWidget(QtWidgets.QWidget):
 		self.sig_changes_ready.connect(self._validate_changes)
 		self.sig_changes_cleared.connect(lambda:self._exporter.allow_export.emit(False))
 		
+		self._chk_show_hidden.stateChanged.connect(lambda show_hidden: self._tree_viewer.hide_non_changes(not show_hidden))
+		self._chk_show_hidden.stateChanged.connect(lambda show_hidden: self._settings.setValue("viewer/showhidden", QtCore.Qt.CheckState(show_hidden)))
 		self._exporter.sig_export_requested.connect(self._save_marker_list)
 	
 	@QtCore.Slot()
@@ -331,6 +355,8 @@ class MainWidget(QtWidgets.QWidget):
 		self._exporter.allow_export(
 			any(m[2] for m in self._markerlist)
 		)
+
+		self._tree_viewer.hide_non_changes(not self._chk_show_hidden.checkState().value)
 
 		self._changes_loaded = True
 	
