@@ -225,11 +225,12 @@ class InputFileChooser(QtWidgets.QWidget):
 	def dropEvent(self, event:QtGui.QDropEvent) -> None:
 		event.acceptProposedAction()
 		try:
-			dropped_path = event.mimeData().text()
-			if dropped_path.startswith("file://"):
-				dropped_path = dropped_path[len("file://"):]
-			self._txt_filepath.setText(str(pathlib.Path(dropped_path)))
-			self.set_start_folder_path(str(pathlib.Path(dropped_path))) # TODO:REDO
+			dropped_uri = event.mimeData().urls()[0]
+			if not dropped_uri.toString().startswith("file:"):
+				return
+			dropped_path = dropped_uri.toLocalFile()
+			self._txt_filepath.setText(dropped_path)
+			self.set_start_folder_path(dropped_path) # TODO:REDO
 		except:
 			pass
 	
