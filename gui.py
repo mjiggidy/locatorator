@@ -7,6 +7,7 @@ MARKER_COMMENT_COLUMN_NAME = "Shot ID"
 EXPORT_TRACK_OPTIONS = ("TC1","V1","V2","V3","V4","V5","V6","V7","V8")
 EXPORT_DEFAULT_MARKER_NAME = "Locatorator"
 EXPORT_DEFAULT_MARKER_COLOR = "white"
+DEFAULT_MARKER_COLOR = "red"
 
 class MarkerIcons:
 
@@ -55,36 +56,44 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 		self.setUniformRowHeights(True)
 		self.setSortingEnabled(True)
 
-	def set_changelist(self, markers_changes:typing.Iterable[typing.Tuple[locatorator.Marker, locatorator.Marker, timecode.Timecode]]) -> None:
+	def set_changelist(self, markers_changes:typing.Iterable[locatorator.MarkerChangeReport]) -> None:
 
 		self.clear()
 
 		changelist = []
 
-		for marker_old, marker_new, relative_offset in markers_changes:
-
-			marker_comment = marker_old.comment if marker_old else marker_new.comment
-			tc_old = str(marker_old.timecode.start) if marker_old else ""
-			tc_new = str(marker_new.timecode.start) if marker_new else ""
-			change = ""
+		for marker_change in markers_changes:
 			
-			if marker_old and marker_new:
-				change = str(relative_offset)
-				if relative_offset > 0:
-					change = "+" + change
-			
-			elif marker_old:
+			if marker_change.change_type == locatorator.ChangeTypes.DELETED:
+				marker_comment = marker_change.marker_old.comment
+				marker_color = MarkerIcons.icons.get(marker_change.marker_old.color.name.lower(), DEFAULT_MARKER_COLOR)
+				tc_old = str(marker_change.marker_old.timecode.start)
+				tc_new = ""
 				change = "Shot Removed"
 			
-			else:
+			elif marker_change.change_type == locatorator.ChangeTypes.ADDED:
+				marker_comment = marker_change.marker_new.comment
+				marker_color = MarkerIcons.icons.get(marker_change.marker_new.color.name.lower(), DEFAULT_MARKER_COLOR)
+				tc_old = ""
+				tc_new = str(marker_change.marker_new.timecode.start)
 				change = "Shot Added"
+
+			else:
+				marker_comment = marker_change.marker_old.comment
+				marker_color = MarkerIcons.icons.get(marker_change.marker_new.color.name.lower(), DEFAULT_MARKER_COLOR)
+				tc_old = str(marker_change.marker_old.timecode.start)
+				tc_new = str(marker_change.marker_new.timecode.start)
+				change = str(marker_change.relative_offset)
+				# Add signed positive TC
+				if marker_change.relative_offset > 0:
+					change = "+" + change
 
 			changelist_item = QtWidgets.QTreeWidgetItem([
 				marker_comment,
 				tc_old,
 				tc_new,
 				change,
-				str(int(relative_offset))
+				str(marker_change.change_type.value)
 			])
 
 			# Align Timecodes right|cener
@@ -93,7 +102,11 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 					changelist_item.setTextAlignment(idx, QtCore.Qt.AlignmentFlag.AlignRight|QtCore.Qt.AlignmentFlag.AlignCenter)
 			
 			# Set marker icon according to the color in the marker list
-			changelist_item.setIcon(0, MarkerIcons.icons.get(marker_new.color.name.lower() if marker_new else marker_old.name.lower(), "red"))
+			changelist_item.setIcon(0, marker_color)
+			if marker_change.change_type == locatorator.ChangeTypes.UNCHANGED:
+				for col in range(len(self._headerlabels)):
+					changelist_item.setForeground(col, QtGui.QColor(QtCore.Qt.GlobalColor.gray)
+				)
 
 			changelist.append(changelist_item)
 
@@ -106,7 +119,7 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 		self.sortByColumn(self._headerlabels.index("New TC"), QtCore.Qt.SortOrder.AscendingOrder)
 
 		self.sig_changes_ready.emit()
-	
+
 	def hide_non_changes(self, hidden:bool):
 		"""Filter"""
 
@@ -114,7 +127,7 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 		max_items = self.topLevelItemCount()
 
 		for item in (self.topLevelItem(x) for x in range(max_items)):
-			if item.text(col_framechange) == "0":
+			if item.text(col_framechange) == str(locatorator.ChangeTypes.UNCHANGED.value):
 				item.setHidden(hidden)
 
 
@@ -217,20 +230,21 @@ class InputFileChooser(QtWidgets.QWidget):
 		self._btn_browse.clicked.connect(self._set_specified_path_from_browser)
 
 	def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
+		"""Respond to dragged files"""
 
-		if event.mimeData().hasFormat("text/uri-list"):
+		if event.mimeData().hasFormat("text/uri-list") and event.mimeData().urls()[0].isLocalFile():
 			self._txt_filepath.setFocus()
 			event.acceptProposedAction()
 
 	def dropEvent(self, event:QtGui.QDropEvent) -> None:
+		"""Allow dropped files"""
 		event.acceptProposedAction()
 		try:
 			dropped_uri = event.mimeData().urls()[0]
-			if not dropped_uri.toString().startswith("file:"):
+			if not dropped_uri.isLocalFile():
 				return
 			dropped_path = dropped_uri.toLocalFile()
-			self._txt_filepath.setText(dropped_path)
-			self.set_start_folder_path(dropped_path) # TODO:REDO
+			self.set_specified_path(dropped_path)
 		except:
 			pass
 	
@@ -242,8 +256,18 @@ class InputFileChooser(QtWidgets.QWidget):
 		"""Open a file browser and set the path from a chosen file"""
 		self._txt_filepath.setFocus()
 		new_path = QtWidgets.QFileDialog.getOpenFileName(self, "Choose a marker list...", self.get_specified_path() or self._start_folder_path, "Marker Lists (*.txt);;All Files (*)")[0]
-		self.set_start_folder_path(new_path)
-		self._txt_filepath.setText(new_path or self._txt_filepath.text())
+		self.set_specified_path(new_path or self._txt_filepath.text())
+	
+	def set_specified_path(self, user_path:str) -> None:
+		"""Set the path as chosen by the user"""
+		try:
+
+			path = str(pathlib.Path(user_path))
+			self.set_start_folder_path(path)
+		except:
+			path = user_path
+
+		self._txt_filepath.setText(path)
 	
 	def get_specified_path(self) -> str:
 		"""Get the path chosen by the user"""
@@ -303,6 +327,7 @@ class InputListGroup(QtWidgets.QGroupBox):
 class MainWidget(QtWidgets.QWidget):
 
 	sig_changes_ready   = QtCore.Signal()
+	sig_changes_failed  = QtCore.Signal()
 	sig_changes_cleared = QtCore.Signal()
 
 	def __init__(self):
@@ -352,9 +377,9 @@ class MainWidget(QtWidgets.QWidget):
 	def _validate_changes(self):
 		"""Marker lists have successfully loaded"""
 		
-		# Ensure at least one change has a non-zero delta or "Shot Added/Removed" message
+		# Export list will only contain changes or additions (no unchanged or deletions)
 		self._exporter.allow_export(
-			any(m[2] for m in self._markerlist)
+			any(m.change_type in (locatorator.ChangeTypes.CHANGED, locatorator.ChangeTypes.ADDED) for m in self._markerlist)
 		)
 
 		self._tree_viewer.hide_non_changes(not self._chk_show_hidden.checkState().value)
@@ -365,35 +390,35 @@ class MainWidget(QtWidgets.QWidget):
 	def _save_marker_list(self, path_output:str, marker_color:locatorator.MarkerColors=locatorator.MarkerColors.WHITE, marker_track:str="TC1", marker_name:str=EXPORT_DEFAULT_MARKER_NAME):
 		"""Export a marker change list"""
 
-		with open(path_output, "w") as file_output:
-			for marker_old, marker_new, tc_delta in self._markerlist:
-				if marker_old and marker_new and tc_delta:
-					marker_output = locatorator.Marker(
-						name=marker_name,
-						color=marker_color,
-						tc_start=str(marker_new.timecode.start),
-						duration=1,
-						track=marker_track,
-						comment=f"Cut change near {marker_new.comment}: {tc_delta} ({marker_old.timecode.start} -> {marker_new.timecode.start})"
-					)
-				elif not marker_old:
-					marker_output = locatorator.Marker(
-						name=marker_name,
-						color=marker_color,
-						tc_start=str(marker_new.timecode.start),
-						duration=1,
-						track=marker_track,
-						comment=f"Shot added: {marker_new.comment}"
-					)
-				else:
-					marker_output = locatorator.Marker(
-						name=marker_name,
-						color=marker_color,
-						tc_start=str(marker_old.timecode.start),
-						duration=1,
-						comment=f"Shot removed: {marker_old.comment}"
-					)
-				print(marker_output, file=file_output)
+		try:
+			with open(path_output, "w") as file_output:
+				for marker_change in self._markerlist:
+					if marker_change.change_type in (locatorator.ChangeTypes.UNCHANGED, locatorator.ChangeTypes.DELETED):
+						continue
+
+					elif marker_change.change_type == locatorator.ChangeTypes.ADDED:
+						marker_output = locatorator.Marker(
+							name=marker_name,
+							color=marker_color,
+							tc_start=str(marker_change.marker_new.timecode.start),
+							duration=1,
+							track=marker_track,
+							comment=f"Shot added: {marker_change.marker_new.comment}"
+						)
+
+					else:
+						marker_output = locatorator.Marker(
+							name=marker_name,
+							color=marker_color,
+							tc_start=str(marker_change.marker_old.timecode.start),
+							duration=1,
+							track=marker_track,
+							comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.framenumber > 0 else ''}{marker_change.relative_offset})"
+						)
+
+					print(marker_output, file=file_output)
+		except Exception as e:
+			QtWidgets.QMessageBox.critical(self, "Error Saving Change List",f"<strong>Cannot save the new marker list:</strong><br/>{e}")
 		
 	
 	def _set_paths(self, path_old:str, path_new:str):
@@ -402,19 +427,31 @@ class MainWidget(QtWidgets.QWidget):
 
 		# Clear out the marker list model
 		self._markerlist = []
+		self._tree_viewer.clear()
 
-		self._path_old = pathlib.Path(path_old)
-		self._path_new = pathlib.Path(path_new)
 
-		with self._path_old.open() as file_old:
-			markers_old = locatorator.get_marker_list_from_file(file_old)
+		try:
+			self._path_old = pathlib.Path(path_old)
+			with self._path_old.open() as file_old:
+				markers_old = locatorator.get_marker_list_from_file(file_old)
+		except Exception as e:
+			self.sig_changes_failed.emit()
+			QtWidgets.QMessageBox.critical(self, "Error Loading Marker List",f"<strong>Cannot load the &quot;Old&quot; marker list:</strong><br/>{e}")
 
-		with self._path_new.open() as file_new:
-			markers_new = locatorator.get_marker_list_from_file(file_new)
+		try:
+			self._path_new = pathlib.Path(path_new)
+			with self._path_new.open() as file_new:
+				markers_new = locatorator.get_marker_list_from_file(file_new)
+		except Exception as e:
+			self.sig_changes_failed.emit()
+			QtWidgets.QMessageBox.critical(self, "Error Loading Marker List",f"<strong>Cannot load the &quot;New&quot; marker list:</strong><br/>{e}")
 		
-		self._markerlist = locatorator.build_marker_changes(markers_old, markers_new)
-
-		self._tree_viewer.set_changelist(self._markerlist)
+		try:
+			self._markerlist = locatorator.build_marker_changes(markers_old, markers_new)
+			self._tree_viewer.set_changelist(self._markerlist)
+		except Exception as e:
+			self.sig_changes_failed.emit()
+			QtWidgets.QMessageBox.critical(self, "Error Comparing Changes",f"<strong>Cannot compare marker lists:</strong><br/>{e}")
 
 		self.sig_changes_ready.emit()
 	
