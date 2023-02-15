@@ -160,16 +160,16 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 		local_offset = marker_new.timecode.start - marker_old.timecode.start if marker_old else 0
 		adjusted_offset = local_offset-running_offset
 		
-		if marker_old is None:
-			change_details = f"New shot ID added: {marker_new.comment} at {marker_new.timecode.start}"
+		#if marker_old is None:
+		#	change_details = f"New shot ID added: {marker_new.comment} at {marker_new.timecode.start}"
 
-		elif adjusted_offset != 0:
-			change_details = f"Cut change at {marker_old.comment}: {marker_old.timecode.start} -> {marker_new.timecode.start}   {'' if adjusted_offset < Timecode(0) else '+'}{adjusted_offset}"
+		if adjusted_offset != 0:
+		#	change_details = f"Cut change at {marker_old.comment}: {marker_old.timecode.start} -> {marker_new.timecode.start}   {'' if adjusted_offset < Timecode(0) else '+'}{adjusted_offset}"
 			running_offset = local_offset
 
 
-		else:
-			continue
+#		else:
+#			continue
 
 		marker_pairs.append(
 			(marker_old, marker_new, adjusted_offset,)
