@@ -1,4 +1,4 @@
-import sys, typing, enum, re, copy
+import sys, typing, enum, re, copy, dataclasses
 from posttools.timecode import Timecode, TimecodeRange
 
 class MarkerColors(enum.Enum):
@@ -11,6 +11,22 @@ class MarkerColors(enum.Enum):
 	YELLOW  = "yellow"
 	BLACK   = "black"
 	WHITE   = "white"
+
+class ChangeTypes(enum.IntEnum):
+	"""Types of changes between marker lists"""
+
+	UNCHANGED = enum.auto()
+	"""Marker position has not changed"""
+
+	CHANGED   = enum.auto()
+	"""Marker position has changed"""
+
+	ADDED     = enum.auto()
+	"""Marker has been added in the new version"""
+
+	DELETED   = enum.auto()
+	"""Marker has been deleted from the new version"""
+
 
 class Marker:
 	"""An Avid Marker/Locator"""
@@ -113,6 +129,19 @@ class Marker:
 		"""Don't try anything silly"""
 		return cls._pat_bad_chars.sub("",text).strip()
 
+@dataclasses.dataclass
+class MarkerChangeReport:
+	"""A comparison between two markers for the same shot"""
+
+	change_type:ChangeTypes
+	"""The type of change between markers"""
+	marker_old:typing.Optional[Marker] = None
+	"""The marker from the old list"""
+	marker_new:typing.Optional[Marker] = None
+	"""The marker from the new list"""
+	relative_offset:typing.Optional[Timecode] = None
+	"""Adjusted/relative change between the two lists"""
+
 def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
 	"""Parse a marker list from a file pointer"""
 
@@ -139,41 +168,53 @@ def build_marker_lookup(marker_list:typing.Iterable[Marker]) -> dict[str, Marker
 	for marker in marker_list:
 		# TODO: Think about shot IDs occurring more than once in a list
 		if marker.comment in marker_lookup:
-			raise ValueError(f"Shot ID \"{marker.comment}\" was found more than once")
+			raise ValueError(f"Shot ID \"{marker.comment}\" was found more than once in the same list.")
 		marker_lookup[marker.comment.lower()] = marker
 	
 	return marker_lookup
 
-def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing.Iterable[Marker]) -> typing.List[typing.Tuple[Marker, Marker, Timecode]]:
+def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing.Iterable[Marker]) -> typing.List[MarkerChangeReport]:
 	"""Build matches of old and new markers"""
 
 	# TODO: This still feels like it's doing too much
 
-	marker_lookup = build_marker_lookup(markers_old)
+	marker_lookup_old = build_marker_lookup(markers_old)
 
-	running_offset = Timecode(0)
+	running_offset = Timecode(0) # The total number of frames offset from the beginning
 	marker_pairs = []
 
 	for marker_new in markers_new:
 
-		marker_old = marker_lookup.get(marker_new.comment.lower())
-		local_offset = marker_new.timecode.start - marker_old.timecode.start if marker_old else 0
-		adjusted_offset = local_offset-running_offset
-		
-		#if marker_old is None:
-		#	change_details = f"New shot ID added: {marker_new.comment} at {marker_new.timecode.start}"
+		# TODO: Rework as `if marker_new.comment.lower() not in marker_lookup_old:`?
+		marker_old = marker_lookup_old.get(marker_new.comment.lower())
+		absolute_offset = marker_new.timecode.start - marker_old.timecode.start if marker_old else 0
+		relative_offset = absolute_offset-running_offset
 
-		if adjusted_offset != 0:
-		#	change_details = f"Cut change at {marker_old.comment}: {marker_old.timecode.start} -> {marker_new.timecode.start}   {'' if adjusted_offset < Timecode(0) else '+'}{adjusted_offset}"
-			running_offset = local_offset
+		if not marker_old:
+			change_report = MarkerChangeReport(
+				change_type = ChangeTypes.ADDED,
+				marker_new = marker_new
+			)
+		else:
+			change_report = MarkerChangeReport(
+				change_type = ChangeTypes.CHANGED if relative_offset.framenumber else ChangeTypes.UNCHANGED,
+				marker_old = marker_old,
+				marker_new = marker_new,
+				relative_offset = relative_offset
+			)
+			del marker_lookup_old[marker_new.comment.lower()]
 
+		if relative_offset != 0:
+			running_offset = absolute_offset
 
-#		else:
-#			continue
-
-		marker_pairs.append(
-			(marker_old, marker_new, adjusted_offset,)
-		)
+		marker_pairs.append(change_report)
+	
+	# Add any remaining shots in marker_lookup_old that went unmatched to the markers_new list
+	for _, marker_old in marker_lookup_old.items():
+		marker_pairs.append(MarkerChangeReport(
+				change_type = ChangeTypes.DELETED,
+				marker_old = marker_old
+		))
 	
 	return marker_pairs
 
