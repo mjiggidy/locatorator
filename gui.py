@@ -300,6 +300,7 @@ class InputListGroup(QtWidgets.QGroupBox):
 		self.layout().addWidget(self._input_new_markers)
 
 		self._btn_compare.setText("Compare Marker Lists")
+		self._btn_compare.setDefault(True)
 		self._btn_compare.setEnabled(False)
 		self.layout().addWidget(self._btn_compare)
 
@@ -410,7 +411,7 @@ class MainWidget(QtWidgets.QWidget):
 						marker_output = locatorator.Marker(
 							name=marker_name,
 							color=marker_color,
-							tc_start=str(marker_change.marker_old.timecode.start),
+							tc_start=str(marker_change.marker_new.timecode.start),
 							duration=1,
 							track=marker_track,
 							comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.framenumber > 0 else ''}{marker_change.relative_offset})"
