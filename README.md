@@ -5,3 +5,5 @@
 `locatorator` will display the changes on-screen, as well as output a new marker list that can be imported into the new sequence to call out changes.
 
 Updated documentation coming soon.
+
+![Locatorator on Mac OS X](docs/locatorator_osx.png)
