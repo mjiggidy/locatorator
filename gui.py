@@ -181,6 +181,7 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 
 		self._cmb_color.currentIndexChanged.connect(lambda: self._settings.setValue("export/markercolor", self._cmb_color.currentData()))
 		self._cmb_track.currentTextChanged.connect(lambda trk: self._settings.setValue("export/markertrack", trk))
+		self._txt_name.editingFinished.connect(lambda: self._settings.setValue("export/markername", self._txt_name.text().strip() or EXPORT_DEFAULT_MARKER_NAME))
 		self._btn_export.clicked.connect(self._export_markers)
 
 	@QtCore.Slot()
@@ -460,7 +461,52 @@ class MainWidget(QtWidgets.QWidget):
 		"""Prepare marker icons based on Marker Colors"""
 		for marker_color in (m.lower() for m in locatorator.MarkerColors._member_names_):
 			MarkerIcons.prepare_icon(marker_color)
-	
+
+class AboutWindow(QtWidgets.QDialog):
+	"""About window"""
+
+	def __init__(self):
+
+		super().__init__()
+
+		self._layout = QtWidgets.QGridLayout()
+		self._lbl_icon = QtWidgets.QLabel()
+
+		self._lbl_program = QtWidgets.QLabel("<strong>Locatorator</strong>")
+		self._lbl_author = QtWidgets.QLabel("By Michael Jordan &lt;<a href=\"mailto:michael@glowingpixel.com\">michael@glowingpixel.com</a>&gt;")
+		self._lbl_description = QtWidgets.QLabel("Compare two Avid marker lists to discover the fun and interesting changes between them.")
+		self._lbl_version = QtWidgets.QLabel("Version 1.0.0")
+
+		self._lbl_all = QtWidgets.QLabel("""<p>
+		<strong>Locatorator</strong><br/>
+		By Michael Jordan &lt;<a href=\"mailto:michael@glowingpixel.com\">michael@glowingpixel.com</a>&gt;</p>
+		<p>Compare two Avid marker lists to discover the fun and interesting changes between them.</p>
+		<p>Github: <a href=\"https://github.com/mjiggidy/locatorator/\">https://github.com/mjiggidy/locatorator/</a><br/>
+		Homepage: <a href=\"https://glowingpixel.com/\">https://glowingpixel.com/</a></p>
+		<p>Version 1.0.0</p>""")
+
+		self._icon = QtGui.QPixmap("resources/icon.png")
+
+		self._setup()
+
+	def _setup(self) -> None:
+
+		self.setWindowTitle("About Locatorator")
+		self.setFixedWidth(400)
+		self.setLayout(self._layout)
+		self.layout().setHorizontalSpacing(24)
+
+		self._lbl_icon.setPixmap(self._icon)
+		self._lbl_icon.setFixedSize(48,48)
+		self._lbl_icon.setScaledContents(True)
+
+		self._lbl_all.setWordWrap(True)
+
+		self.layout().addWidget(self._lbl_icon, 0, 0, QtGui.Qt.AlignmentFlag.AlignTop)
+		self.layout().addWidget(self._lbl_all, 0, 1)
+		#self.layout().addWidget(self._lbl_description, 1, 1)
+		#self.layout().addWidget(self._lbl_description, 2, 1)
+
 class MainWindow(QtWidgets.QMainWindow):
 	"""Main Program Window"""
 
@@ -468,6 +514,8 @@ class MainWindow(QtWidgets.QMainWindow):
 		super().__init__()
 
 		self.wdg_main = MainWidget()
+
+		self.wnd_about = AboutWindow()
 
 		self._setup()
 	
@@ -478,12 +526,19 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.setWindowTitle("Locatorator")
 		self.setMinimumWidth(450)
 
+		menu_help = QtWidgets.QMenu("&Help")
+		menu_help.addAction("About", self.wnd_about.exec)
+
+		self.menuBar().addMenu(menu_help)
+
 def main() -> int:
 	"""Launch the QApplication"""
 	
 	app = QtWidgets.QApplication(sys.argv)
 	app.setOrganizationName("GlowingPixel")
 	app.setApplicationName("Locatorator")
+
+	app.setWindowIcon(QtGui.QPixmap("resources/icon.png"))
 
 	wnd_main = MainWindow()
 	wnd_main.show()
