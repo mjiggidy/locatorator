@@ -14,7 +14,9 @@ pip3 install .
 ## Usage
 Once installed, two commands will be available to you:
 
-*`locatorator` - The GUI-based program
-*`locatorator_cli` - The command-line version of the program
+* `locatorator` - The GUI-based program
+* `locatorator_cli` - The command-line version of the program
+
+## Screenshots
 
 ![Locatorator on Mac OS X](docs/locatorator_osx.png)
