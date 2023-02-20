@@ -133,7 +133,7 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 class OutputFileGroup(QtWidgets.QGroupBox):
 	"""Marker list export groupbox"""
 
-	sig_export_requested = QtCore.Signal(str, locatorator.MarkerColors, str, str)
+	sig_export_requested = QtCore.Signal(locatorator.MarkerColors, str, str)
 	"""User has requested an export"""
 
 	sig_export_canceled = QtCore.Signal()
@@ -189,16 +189,9 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 		self._btn_export.setEnabled(allowed)
 	
 	@QtCore.Slot()
-	def _export_markers(self, markers:typing.Iterable[locatorator.Marker]) -> None:
+	def _export_markers(self) -> None:
 		"""Export a given marker list"""
-
-		path_output = QtWidgets.QFileDialog.getSaveFileName(self, "Choose a location to save your markers", filter="Marker Lists (*.txt);;All Files (*)")[0]
-		
-		if not path_output:
-			self.sig_export_canceled.emit()
-			return
-		
-		self.sig_export_requested.emit(path_output, locatorator.MarkerColors(self._cmb_color.currentData()), self._cmb_track.currentText(), self._txt_name.text())
+		self.sig_export_requested.emit(locatorator.MarkerColors(self._cmb_color.currentData()), self._cmb_track.currentText(), self._txt_name.text())
 
 class InputFileChooser(QtWidgets.QWidget):
 	"""Choose an input file"""
@@ -393,8 +386,14 @@ class MainWidget(QtWidgets.QWidget):
 		self._changes_loaded = True
 	
 	@QtCore.Slot()
-	def _save_marker_list(self, path_output:str, marker_color:locatorator.MarkerColors=locatorator.MarkerColors.WHITE, marker_track:str="TC1", marker_name:str=EXPORT_DEFAULT_MARKER_NAME):
+	def _save_marker_list(self, marker_color:locatorator.MarkerColors=locatorator.MarkerColors.WHITE, marker_track:str="TC1", marker_name:str=EXPORT_DEFAULT_MARKER_NAME):
 		"""Export a marker change list"""
+
+		path_output = QtWidgets.QFileDialog.getSaveFileName(self, "Choose a location to save your markers", dir=self._suggest_output_path(), filter="Marker Lists (*.txt);;All Files (*)")[0]
+		
+		if not path_output:
+#			self.sig_export_canceled.emit()
+			return
 
 		try:
 			with open(path_output, "w") as file_output:
@@ -423,10 +422,25 @@ class MainWidget(QtWidgets.QWidget):
 						)
 
 					print(marker_output, file=file_output)
+
 		except Exception as e:
 			QtWidgets.QMessageBox.critical(self, "Error Saving Change List",f"<strong>Cannot save the new marker list:</strong><br/>{e}")
+			return
 		
+		self._settings.setValue("export/lastoutputpath",path_output)
 	
+	def _suggest_output_path(self) -> str:
+		"""Suggest an output path"""
+		try:
+			return str(
+				pathlib.Path(
+					self._settings.value("export/lastoutputpath","./changes.txt")
+				).with_name(self._path_old.stem.strip() + " vs " + self._path_new.stem + ".txt")
+			)
+		except Exception as e:
+			print(e)
+			return "changes.txt"
+
 	def _set_paths(self, path_old:str, path_new:str):
 		"""Update the program paths and run the comparison"""
 		# TODO: Split this out?
