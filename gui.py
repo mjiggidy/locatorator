@@ -510,13 +510,14 @@ class AboutWindow(QtWidgets.QDialog):
 		<p>Version 1.0.0</p>""")
 
 		self._icon = QtGui.QPixmap("resources/icon.png")
+		self._btn_close = QtWidgets.QPushButton("Ok")
 
 		self._setup()
 
 	def _setup(self) -> None:
 
 		self.setWindowTitle("About Locatorator")
-		self.setFixedWidth(400)
+		self.setFixedWidth(450)
 		self.setLayout(self._layout)
 		self.layout().setHorizontalSpacing(24)
 
@@ -525,11 +526,15 @@ class AboutWindow(QtWidgets.QDialog):
 		self._lbl_icon.setScaledContents(True)
 
 		self._lbl_all.setWordWrap(True)
+		self._lbl_all.setOpenExternalLinks(True)
 
 		self.layout().addWidget(self._lbl_icon, 0, 0, QtGui.Qt.AlignmentFlag.AlignTop)
-		self.layout().addWidget(self._lbl_all, 0, 1)
+		self.layout().addWidget(self._lbl_all, 0, 1, QtGui.Qt.AlignmentFlag.AlignTop)
+		self.layout().addWidget(self._btn_close, 1,1)
 		#self.layout().addWidget(self._lbl_description, 1, 1)
 		#self.layout().addWidget(self._lbl_description, 2, 1)
+
+		self._btn_close.clicked.connect(self.close)
 
 class MainWindow(QtWidgets.QMainWindow):
 	"""Main Program Window"""
