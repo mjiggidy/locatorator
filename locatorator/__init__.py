@@ -218,21 +218,34 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 	
 	return marker_pairs
 
-def write_change_list(markers_changes:typing.Iterable[typing.Tuple[Marker,str]], file_output:typing.TextIO, marker_name="Locatorator", marker_track:str="TC1", marker_color:MarkerColors=MarkerColors.WHITE):
+def write_change_list(markers_changes:typing.Iterable[MarkerChangeReport], file_output:typing.TextIO, marker_name="Locatorator", marker_track:str="TC1", marker_color:MarkerColors=MarkerColors.WHITE):
 	"""Write changes to a new marker list"""
 
-	for marker, comment in markers_changes:
-		print(
-			Marker(
+	for marker_change in markers_changes:
+		if marker_change.change_type in (ChangeTypes.UNCHANGED, ChangeTypes.DELETED):
+			continue
+
+		elif marker_change.change_type == ChangeTypes.ADDED:
+			marker_output = Marker(
 				name=marker_name,
-				tc_start = str(marker.timecode.start),
-				track=marker_track,
 				color=marker_color,
-				comment=comment,
-				duration=1
-			),
-			file=file_output
-		)
+				tc_start=str(marker_change.marker_new.timecode.start),
+				duration=1,
+				track=marker_track,
+				comment=f"Shot added: {marker_change.marker_new.comment}"
+			)
+
+		else:
+			marker_output = Marker(
+				name=marker_name,
+				color=marker_color,
+				tc_start=str(marker_change.marker_new.timecode.start),
+				duration=1,
+				track=marker_track,
+				comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.framenumber > 0 else ''}{marker_change.relative_offset})"
+			)
+
+		print(marker_output, file=file_output)
 	
 def print_change_list(markers_changes) -> None:
 	"""Print changes to screen"""
