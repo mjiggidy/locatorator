@@ -8,8 +8,10 @@
 Gently clone this repo, then install:
 
 ```bash
-pip3 install .
+pip3 install /path/to/locatorator
 ```
+
+Note: Due to the dependencies, I'd create a virtual environment first. But you do you.
 
 ## Usage
 Once installed, two commands will be available to you:
