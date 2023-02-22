@@ -2,6 +2,7 @@ from PySide6 import QtWidgets, QtCore, QtGui
 from posttools import timecode
 import sys, pathlib, typing
 import locatorator
+from locatorator import resources
 
 MARKER_COMMENT_COLUMN_NAME = "Shot ID"
 EXPORT_TRACK_OPTIONS = ("TC1","V1","V2","V3","V4","V5","V6","V7","V8")
@@ -509,7 +510,7 @@ class AboutWindow(QtWidgets.QDialog):
 		Homepage: <a href=\"https://glowingpixel.com/\">https://glowingpixel.com/</a></p>
 		<p>Version 1.0.0</p>""")
 
-		self._icon = QtGui.QPixmap("resources/icon.png")
+		self._icon = QtGui.QPixmap(":/icons/resources/icon.png")
 		self._btn_close = QtWidgets.QPushButton("Ok")
 
 		self._setup()
@@ -567,7 +568,7 @@ def main() -> int:
 	app.setOrganizationName("GlowingPixel")
 	app.setApplicationName("Locatorator")
 
-	app.setWindowIcon(QtGui.QPixmap("resources/icon.png"))
+	app.setWindowIcon(QtGui.QPixmap(":/icons/resources/icon.png"))
 
 	wnd_main = MainWindow()
 	wnd_main.show()
