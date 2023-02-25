@@ -537,6 +537,46 @@ class AboutWindow(QtWidgets.QDialog):
 
 		self._btn_close.clicked.connect(self.close)
 
+class SettingsWindow(QtWidgets.QDialog):
+	"""Program settings"""
+
+	def __init__(self):
+		super().__init__()
+
+		self._settings = QtCore.QSettings()
+		self._layout = QtWidgets.QGridLayout()
+
+		self._lbl_tc_rate = QtWidgets.QLabel()
+		self._cmb_tc_rate = QtWidgets.QComboBox()
+
+		self._btns_submit = QtWidgets.QDialogButtonBox()
+
+		self._setup()
+
+	def _setup(self):
+
+		self.setWindowTitle("Settings")
+
+		self.setLayout(self._layout)
+
+		self._lbl_tc_rate.setText("Timecode Rate")
+		self.layout().addWidget(self._lbl_tc_rate, 0, 0)
+
+		self._cmb_tc_rate.addItems(("24","30"))
+		self.layout().addWidget(self._cmb_tc_rate, 0, 1)
+
+		self._btns_submit.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Save|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+		self._btns_submit.rejected.connect(self.close)
+		self._btns_submit.accepted.connect(self._save_settings)
+
+		self.layout().addWidget(self._btns_submit, 1, 0, 1, 2)
+	
+	def _save_settings(self):
+		"""Write settings to QSettings"""
+		print("Nice")
+		self.close()
+
+
 class MainWindow(QtWidgets.QMainWindow):
 	"""Main Program Window"""
 
@@ -546,6 +586,7 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.wdg_main = MainWidget()
 
 		self.wnd_about = AboutWindow()
+		self.wnd_settings = SettingsWindow()
 
 		self._setup()
 	
@@ -556,18 +597,22 @@ class MainWindow(QtWidgets.QMainWindow):
 		self.setWindowTitle("Locatorator")
 		self.setMinimumWidth(500)
 
-		menu_help = QtWidgets.QMenu("&Help")
-		menu_help.addAction("About", self.wnd_about.exec)
+		menu_file = QtWidgets.QMenu("&File")
+		menu_file.addAction("&Settings...", self.wnd_settings.exec)
 
+		menu_help = QtWidgets.QMenu("&Help")
+		menu_help.addAction("About Locatorator...", self.wnd_about.exec)
+
+		self.menuBar().addMenu(menu_file)
 		self.menuBar().addMenu(menu_help)
 
 def main() -> int:
 	"""Launch the QApplication"""
 	
 	app = QtWidgets.QApplication(sys.argv)
+
 	app.setOrganizationName("GlowingPixel")
 	app.setApplicationName("Locatorator")
-
 	app.setWindowIcon(QtGui.QPixmap(":/icons/resources/icon.png"))
 
 	wnd_main = MainWindow()
