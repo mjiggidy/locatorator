@@ -27,7 +27,7 @@ jobs:
     - name: Build .app with pyinstaller
       run: |
         pyinstaller Locatorator.spec
-    - name: ZIP the new ap
+    - name: ZIP the new app
       run: |
         cd dist/
         zip -r -9 locatorator_mac.zip *.app
@@ -35,5 +35,5 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: assets-for-download
-        path: locatorator.zip
+        path: locatorator_mac.zip
     
