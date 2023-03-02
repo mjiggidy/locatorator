@@ -16,7 +16,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.11
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v4
       with:
         python-version: "3.11"
     - name: Install dependencies
@@ -27,13 +27,13 @@ jobs:
     - name: Build .app with pyinstaller
       run: |
         pyinstaller Locatorator.spec
-    - name: ZIP the new app
-      run: |
-        cd dist/
-        zip -r -9 locatorator_mac.zip *.app
+ #   - name: ZIP the new app
+  #    run: |
+   #     cd dist/
+    #    zip -r -9 locatorator_mac.zip *.app
     - name: Upload zipped app as artifact
       uses: actions/upload-artifact@v2
       with:
-        name: assets-for-download
-        path: dist/locatorator_mac.zip
+        name: locatorator_mac.zip
+        path: dist/Locatorator.app
     
