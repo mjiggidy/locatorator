@@ -29,7 +29,7 @@ jobs:
         if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
     - name: Build .app with pyinstaller
       run: |
-        pyinstaller Locatorator.spec
+        pyinstaller locatorator_mac.spec
     - name: ZIP the new app
       run: |
         cd dist/
@@ -44,18 +44,37 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - name: Install NSIS
-        run: |
-          iwr -useb get.scoop.sh -outfile 'install.ps1'
-          .\install.ps1 -RunAsAdmin
-          scoop update
-          scoop bucket add extras
-          scoop install nsis
-      - name: Print NSIS version
-        run: makensis -VERSION
-      - name: Print NSIS compile flags
-        run: makensis -HDRINFO
-        
+    
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller pillow
+        pip install -r requirements.txt
+    - name: Build with pyinstaller
+      run: |
+        pyinstaller locatorator_win.spec
+    - name: Download EnVar plugin for NSIS
+      uses: carlosperate/download-file-action@v1.0.3
+      with:
+        file-url: https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip
+        file-name: envar_plugin.zip
+        location: ${{ github.workspace }}
+    - name: Create NSIS installer
+      uses: joncloud/makensis-action@publish
+      with:
+        script-file: locatorator.nsi
+        additional-plugin-paths: ${{ github.workspace }}/NSIS_Plugins/Plugins
+        arguments: "dist/Locatorator"
+    - name: Upload to Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: "locatorator_setup.exe"
 #    - name: Upload zipped app as artifact
 #      uses: actions/upload-artifact@v3
 #      with:
