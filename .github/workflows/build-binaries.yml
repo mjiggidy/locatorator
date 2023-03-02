@@ -27,6 +27,13 @@ jobs:
     - name: Build .app with pyinstaller
       run: |
         pyinstaller Locatorator.spec
-    - name: Test with pytest
+    - name: ZIP the new ap
       run: |
-        pytest
+        cd dist/
+        zip -r -9 locatorator_mac.zip *.app
+    - name: Upload zipped app as artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: assets-for-download
+        path: locatorator.zip
+    
