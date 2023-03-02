@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-macos:
 
     runs-on: macos-latest
 
@@ -40,6 +40,21 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: "dist/locatorator_${{ github.ref_name }}_mac.zip"
+        
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Install NSIS
+        run: |
+          iwr -useb get.scoop.sh -outfile 'install.ps1'
+          .\install.ps1 -RunAsAdmin
+          scoop update
+          scoop bucket add extras
+          scoop install nsis
+      - name: Print NSIS version
+        run: makensis -VERSION
+      - name: Print NSIS compile flags
+        run: makensis -HDRINFO
         
 #    - name: Upload zipped app as artifact
 #      uses: actions/upload-artifact@v3
