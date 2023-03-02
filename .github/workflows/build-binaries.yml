@@ -58,17 +58,17 @@ jobs:
     - name: Build with pyinstaller
       run: |
         pyinstaller locatorator_win.spec
-    - name: Download EnVar plugin for NSIS
-      uses: carlosperate/download-file-action@v1.0.3
-      with:
-        file-url: https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip
-        file-name: envar_plugin.zip
-        location: ${{ github.workspace }}
+#    - name: Download EnVar plugin for NSIS
+#      uses: carlosperate/download-file-action@v1.0.3
+#      with:
+#        file-url: https://nsis.sourceforge.io/mediawiki/images/7/7f/EnVar_plugin.zip
+#        file-name: envar_plugin.zip
+#        location: ${{ github.workspace }}
     - name: Create NSIS installer
       uses: joncloud/makensis-action@publish
       with:
         script-file: locatorator.nsi
-        additional-plugin-paths: ${{ github.workspace }}/NSIS_Plugins/Plugins
+#        additional-plugin-paths: ${{ github.workspace }}/NSIS_Plugins/Plugins
         arguments: "dist/Locatorator"
     - name: Upload to Release
       uses: softprops/action-gh-release@v1
