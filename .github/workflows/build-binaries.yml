@@ -27,13 +27,11 @@ jobs:
     - name: Build .app with pyinstaller
       run: |
         pyinstaller Locatorator.spec
- #   - name: ZIP the new app
-  #    run: |
-   #     cd dist/
-    #    zip -r -9 locatorator_mac.zip *.app
+    - name: ZIP the new app
+      run: |
+        cd dist/
+        zip -r -9 "locatorator_${{ github.ref_name }}_mac.zip" *.app
     - name: Upload zipped app as artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
-        name: locatorator_mac.zip
-        path: dist/Locatorator.app
-    
+        path: "dist/locatorator_${{ github.ref_name }}_mac.zip"
