@@ -35,5 +35,5 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: assets-for-download
-        path: locatorator_mac.zip
+        path: dist/locatorator_mac.zip
     
