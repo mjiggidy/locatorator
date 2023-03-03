@@ -43,7 +43,7 @@ Section "Locatorator Application (required)"
   SetOutPath $INSTDIR
   
   ; Put file there
-  File /r "..\Locatorator\*"
+  File /r "dist\Locatorator\*"
   
   ; Write the installation path into the registry
   WriteRegStr HKLM SOFTWARE\GlowingPixel\Locatorator "Install_Dir" "$INSTDIR"
