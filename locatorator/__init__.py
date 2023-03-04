@@ -1,5 +1,6 @@
 import sys, typing, enum, re, copy, dataclasses
 from posttools.timecode import Timecode, TimecodeRange
+from xml.etree import ElementTree as et
 
 class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
@@ -26,7 +27,6 @@ class ChangeTypes(enum.IntEnum):
 
 	DELETED   = enum.auto()
 	"""Marker has been deleted from the new version"""
-
 
 class Marker:
 	"""An Avid Marker/Locator"""
@@ -93,6 +93,47 @@ class Marker:
 			duration = int(m[5])
 		)
 	
+	@classmethod
+	def from_xml(cls, xml_avclass:et.Element) -> "Marker":
+		"""Create a marker from an XML AvClass element"""
+
+		m_props = dict()
+
+		for xml_property in xml_avclass.findall("List[@id='OMFI:ATTR:AttrRefs']/ListElem"):
+			
+			# MArker list XMLs tend to have an empty <ListElem/> for some reason
+			if not xml_property.findall("AvProp"):
+				continue
+
+			property_name = xml_property.find("AvProp[@name='OMFI:ATTB:Name']").text.upper()
+
+			if property_name == "_ATN_CRM_USER":
+				m_props["name"] = xml_property.find("AvProp[@name='OMFI:ATTB:StringAttribute']").text
+
+			elif property_name == "_ATN_CRM_TC":
+				m_props["tc"] = xml_property.find("AvProp[@name='OMFI:ATTB:StringAttribute']").text
+
+			elif property_name == "_ATN_CRM_TRK":
+				m_props["track"] = xml_property.find("AvProp[@name='OMFI:ATTB:StringAttribute']").text
+
+			elif property_name == "_ATN_CRM_COLOR":
+				m_props["color"] = xml_property.find("AvProp[@name='OMFI:ATTB:StringAttribute']").text.lower()
+
+			elif property_name == "_ATN_CRM_COM":
+				m_props["comment"] = xml_property.find("AvProp[@name='OMFI:ATTB:StringAttribute']").text
+
+			elif property_name == "_ATN_CRM_LENGTH":
+				m_props["duration"] = int(xml_property.find("AvProp[@name='OMFI:ATTB:IntAttribute']").text)
+		
+		return cls(
+			name = m_props.get("name","Locatorator"),
+			tc_start = m_props.get("tc"),
+			track = m_props.get("track","V1"),
+			color = m_props.get("color","red"),
+			comment = m_props.get("comment",""),
+			duration = m_props.get("duration",1)
+		)
+	
 	def __str__(self) -> str:
 		return "\t".join([
 			self.name,
@@ -123,11 +164,88 @@ class Marker:
 	def __hash__(self) -> str:
 		return hash(self.name, self.track, self.timecode, self.comment)
 		
-	
 	@classmethod
 	def _sanitize_string(cls, text:str) -> str:
 		"""Don't try anything silly"""
 		return cls._pat_bad_chars.sub("",text).strip()
+
+class MarkerList(list):
+	"""An Avid Marker List"""
+	
+	def __init__(self, iterable=None):
+		iterable = iterable or []
+		super().__init__(self._check_marker(item) for item in iterable)
+
+	def __setitem__(self, index, item):
+		super().__setitem__(index, self._check_marker(item))
+
+	def insert(self, index, item):
+		super().insert(index, self._check_marker(item))
+
+	def append(self, item):
+		super().append(self._check_marker(item))
+
+	def extend(self, other):
+		if isinstance(other, type(self)):
+			super().extend(other)
+		else:
+			super().extend(self._check_marker(item) for item in other)
+
+	def _check_marker(self, value):
+		"""Ensure we storin dem Markers"""
+
+		if isinstance(value, Marker):
+			return value
+		raise TypeError(f"MarkerLists are for Marker instances only (not {type(value).__name__}).")
+
+	@classmethod
+	def from_xml_file(cls, xml_path:str) -> "MarkerList":
+		"""Loosely parse from an Avid XML"""
+
+		xml_filedata = et.parse(xml_path)
+		xml_markers = xml_filedata.getroot().findall("{http://www.avid.com}XMLFileData/AvClass[@id='ATTR']")
+
+		return cls(
+			Marker.from_xml(xml_marker) for xml_marker in xml_markers
+		)
+	
+	@classmethod
+	def from_text_file(cls, file_path:str) -> "MarkerList":
+		"""Parse a marker list from a tab-delimited text file path"""
+
+		markers = cls()
+
+		with open(file_path) as file_input:
+			for idx, line in enumerate(l.rstrip('\n') for l in file_input.readlines()):
+				try:
+					marker = Marker.from_string(line)
+				except Exception as e:
+					raise ValueError(f"Cannot parse marker on line {idx+1}: {e}")
+
+				# TODO: Add filtering? Ex: Filter only blue markers
+				# if marker.color != MarkerColors.BLUE:
+				#	continue
+
+				markers.append(marker)
+		
+		return markers
+	
+	@classmethod
+	def from_file(cls, file_path:str) -> "MarkerList":
+		"""Parse a marker list form a given path"""
+
+		file_path = str(file_path)
+
+		if file_path.lower().endswith(".txt"):
+			return cls.from_text_file(file_path)
+		elif file_path.lower().endswith(".xml"):
+			return cls.from_xml_file(file_path)
+		else:
+			raise ValueError("Unrecognized file extension")
+		
+	
+	def __str__(self):
+		return '\n'.join(str(marker) for marker in self)
 
 @dataclasses.dataclass
 class MarkerChangeReport:
@@ -141,25 +259,6 @@ class MarkerChangeReport:
 	"""The marker from the new list"""
 	relative_offset:typing.Optional[Timecode] = None
 	"""Adjusted/relative change between the two lists"""
-
-def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
-	"""Parse a marker list from a file pointer"""
-
-	markers = []
-
-	for idx, line in enumerate(l.rstrip('\n') for l in file_input.readlines()):
-		try:
-			marker = Marker.from_string(line)
-		except Exception as e:
-			raise ValueError(f"Cannot parse marker on line {idx+1}: {e}")
-
-		# TODO: Add filtering? Ex: Filter only blue markers
-		# if marker.color != MarkerColors.BLUE:
-		#	continue
-
-		markers.append(marker)
-	
-	return markers
 
 def build_marker_lookup(marker_list:typing.Iterable[Marker]) -> dict[str, Marker]:
 	"""Build a dict based on marker comments"""
