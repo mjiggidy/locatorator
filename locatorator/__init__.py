@@ -229,6 +229,23 @@ class MarkerList(list):
 				markers.append(marker)
 		
 		return markers
+	
+	@classmethod
+	def from_file(cls, file_path:str) -> "MarkerList":
+		"""Parse a marker list form a given path"""
+
+		file_path = str(file_path)
+
+		if file_path.lower().endswith(".txt"):
+			return cls.from_text_file(file_path)
+		elif file_path.lower().endswith(".xml"):
+			return cls.from_xml_file(file_path)
+		else:
+			raise ValueError("Unrecognized file extension")
+		
+	
+	def __str__(self):
+		return '\n'.join(str(marker) for marker in self)
 
 @dataclasses.dataclass
 class MarkerChangeReport:
@@ -242,25 +259,6 @@ class MarkerChangeReport:
 	"""The marker from the new list"""
 	relative_offset:typing.Optional[Timecode] = None
 	"""Adjusted/relative change between the two lists"""
-
-def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
-	"""Parse a marker list from a file pointer"""
-
-	markers = []
-
-	for idx, line in enumerate(l.rstrip('\n') for l in file_input.readlines()):
-		try:
-			marker = Marker.from_string(line)
-		except Exception as e:
-			raise ValueError(f"Cannot parse marker on line {idx+1}: {e}")
-
-		# TODO: Add filtering? Ex: Filter only blue markers
-		# if marker.color != MarkerColors.BLUE:
-		#	continue
-
-		markers.append(marker)
-	
-	return markers
 
 def build_marker_lookup(marker_list:typing.Iterable[Marker]) -> dict[str, Marker]:
 	"""Build a dict based on marker comments"""
