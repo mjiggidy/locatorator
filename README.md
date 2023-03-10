@@ -5,6 +5,11 @@
 `locatorator` will display the changes on-screen, as well as output a new marker list that can be imported into the new sequence to call out changes.
 
 ## Installation
+### The Easy Way
+Download the latest release for your OS here:
+https://github.com/mjiggidy/locatorator/releases/latest
+
+### The ~~Hard~~ Cool Way
 Gently clone this repo, then install:
 
 ```bash
