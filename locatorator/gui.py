@@ -1,8 +1,6 @@
 from PySide6 import QtWidgets, QtCore, QtGui
-from posttools import timecode
 import sys, pathlib, typing
 import locatorator
-from locatorator import resources
 
 MARKER_COMMENT_COLUMN_NAME = "Shot ID"
 EXPORT_TRACK_OPTIONS = ("TC1","V1","V2","V3","V4","V5","V6","V7","V8")

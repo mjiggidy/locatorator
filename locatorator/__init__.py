@@ -1,4 +1,4 @@
-import sys, typing, enum, re, copy, dataclasses
+import typing, enum, re, copy, dataclasses
 from posttools.timecode import Timecode, TimecodeRange
 
 class MarkerColors(enum.Enum):

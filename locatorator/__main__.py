@@ -1,5 +1,4 @@
-import sys, typing, enum, re, copy, pathlib
-from posttools.timecode import Timecode, TimecodeRange
+import sys
 import locatorator
 	
 def print_change_list(markers_changes) -> None:
