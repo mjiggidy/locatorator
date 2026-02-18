@@ -104,7 +104,7 @@ class Marker:
 	@property
 	def is_spanned(self) -> bool:
 		"""Is this a spanned marker"""
-		return self.timecode.duration.framenumber > 1
+		return self.timecode.duration.frame_number > 1
 		
 	@classmethod
 	def from_string(cls, line:str) -> "Marker":
