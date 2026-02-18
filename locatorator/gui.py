@@ -508,7 +508,7 @@ class AboutWindow(QtWidgets.QDialog):
 		<p>Compare two Avid marker lists to discover the fun and interesting changes between them.</p>
 		<p>Github: <a href=\"https://github.com/mjiggidy/locatorator/\">https://github.com/mjiggidy/locatorator/</a><br/>
 		Homepage: <a href=\"https://glowingpixel.com/\">https://glowingpixel.com/</a><br/>
-		Dontations: <a href=\"https://ko-fi.com/lilbinboy\">https://ko-fi.com/lilbinboy</a></p>
+		Donations: <a href=\"https://ko-fi.com/lilbinboy\">https://ko-fi.com/lilbinboy</a></p>
 		<p>Version {QtWidgets.QApplication.instance().applicationVersion()}</p>""")
 
 		self._icon = QtGui.QPixmap(":/icons/resources/icon.png")
