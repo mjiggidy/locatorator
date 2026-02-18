@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         python3 -m pip install --upgrade pip
-        pip3 install pyinstaller==5.7 pillow
+        pip3 install pyinstaller pillow
         if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
         brew install create-dmg
     - name: Build .app with pyinstaller
