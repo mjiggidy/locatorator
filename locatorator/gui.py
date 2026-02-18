@@ -500,15 +500,16 @@ class AboutWindow(QtWidgets.QDialog):
 		self._lbl_program = QtWidgets.QLabel("<strong>Locatorator</strong>")
 		self._lbl_author = QtWidgets.QLabel("By Michael Jordan &lt;<a href=\"mailto:michael@glowingpixel.com\">michael@glowingpixel.com</a>&gt;")
 		self._lbl_description = QtWidgets.QLabel("Compare two Avid marker lists to discover the fun and interesting changes between them.")
-		self._lbl_version = QtWidgets.QLabel("Version 1.0.0")
+		self._lbl_version = QtWidgets.QLabel(f"Version {QtWidgets.QApplication.instance().applicationVersion()}")
 
-		self._lbl_all = QtWidgets.QLabel("""<p>
+		self._lbl_all = QtWidgets.QLabel(f"""<p>
 		<strong>Locatorator</strong><br/>
 		By Michael Jordan &lt;<a href=\"mailto:michael@glowingpixel.com\">michael@glowingpixel.com</a>&gt;</p>
 		<p>Compare two Avid marker lists to discover the fun and interesting changes between them.</p>
 		<p>Github: <a href=\"https://github.com/mjiggidy/locatorator/\">https://github.com/mjiggidy/locatorator/</a><br/>
-		Homepage: <a href=\"https://glowingpixel.com/\">https://glowingpixel.com/</a></p>
-		<p>Version 1.0.0</p>""")
+		Homepage: <a href=\"https://glowingpixel.com/\">https://glowingpixel.com/</a><br/>
+		Dontations: <a href=\"https://ko-fi.com/lilbinboy\">https://ko-fi.com/lilbinboy</a></p>
+		<p>Version {QtWidgets.QApplication.instance().applicationVersion()}</p>""")
 
 		self._icon = QtGui.QPixmap(":/icons/resources/icon.png")
 		self._btn_close = QtWidgets.QPushButton("Ok")
@@ -567,6 +568,7 @@ def main() -> int:
 	app = QtWidgets.QApplication(sys.argv)
 	app.setOrganizationName("GlowingPixel")
 	app.setApplicationName("Locatorator")
+	app.setApplicationVersion("1.1.0")
 
 	app.setWindowIcon(QtGui.QPixmap(":/icons/resources/icon.png"))
 
