@@ -3,6 +3,8 @@ from posttools.timecode import Timecode, TimecodeRange
 
 class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
+	
+	# Traditional colors
 	RED     = "red"
 	GREEN   = "green"
 	BLUE    = "blue"
@@ -11,6 +13,38 @@ class MarkerColors(enum.Enum):
 	YELLOW  = "yellow"
 	BLACK   = "black"
 	WHITE   = "white"
+
+	# Extended colors (2024.6+)
+	PINK    = "pink"
+	FOREST  = "forest"
+	DENIM   = "denim"
+	VIOLET  = "violet"
+	PURPLE  = "purple"
+	ORANGE  = "orange"
+	GREY    = "grey"
+	GOLD    = "gold"
+
+CLASSIC_MARKER_SET = {
+	MarkerColors.RED,
+	MarkerColors.GREEN,
+	MarkerColors.BLUE,
+	MarkerColors.CYAN,
+	MarkerColors.MAGENTA,
+	MarkerColors.YELLOW,
+	MarkerColors.BLACK,
+	MarkerColors.WHITE,
+}
+
+EXTENDED_MARKER_SET = {
+	MarkerColors.PINK,
+	MarkerColors.FOREST,
+	MarkerColors.DENIM,
+	MarkerColors.VIOLET,
+	MarkerColors.PURPLE,
+	MarkerColors.ORANGE,
+	MarkerColors.GREY,
+	MarkerColors.GOLD,
+}
 
 class ChangeTypes(enum.IntEnum):
 	"""Types of changes between marker lists"""
@@ -33,13 +67,14 @@ class Marker:
 
 	_pat_bad_chars = re.compile("[\n\t]")
 
-	def __init__(self, *, name:str, tc_start:typing.Union[str,Timecode], track:str, color:typing.Union[str,MarkerColors], comment:str, duration:int):
+	def __init__(self, *, name:str, tc_start:typing.Union[str,Timecode], track:str, color:typing.Union[str,MarkerColors], comment:str, duration:int, user:str=""):
 
 		self._name    = self._sanitize_string(name)
 		self._tc      = TimecodeRange(start=Timecode(tc_start), duration=Timecode(duration))
 		self._track   = self._sanitize_string(track)
 		self._color   = MarkerColors(color)
 		self._comment = self._sanitize_string(comment)
+		self._user    = self._sanitize_string(user)
 	
 	@property
 	def name(self) -> str:
@@ -84,23 +119,47 @@ class Marker:
 		Comment
 		Duration (frames)
 		"""
-		return cls(
-			name = m[0],
-			tc_start = m[1],
-			track = m[2],
-			color = m[3],
-			comment = m[4],
-			duration = int(m[5])
-		)
+
+		if len(m) == 6:
+
+			return cls(
+				name = m[0],
+				tc_start = m[1],
+				track = m[2],
+				color = str(m[3]).lower(),
+				comment = m[4],
+				duration = int(m[5]),
+				user = ""
+			)
+		
+		elif len(m) == 8:
+
+			return cls(
+				name = m[0],
+				tc_start = m[1],
+				track = m[2],
+				color = str(m[7]).lower(),
+				comment = m[4],
+				duration = int(m[5]),
+				user = m[6]
+			)
+		
+		else:
+			raise ValueError("Unknown marker list format")
 	
 	def __str__(self) -> str:
+
+		# FOR NOW: Always using "new" format
+		
 		return "\t".join([
 			self.name,
 			str(self.timecode.start),
 			self.track,
-			self.color.value,
+			self.color.value.title() if self.color in CLASSIC_MARKER_SET else "Yellow",
 			self.comment,
-			str(self.timecode.duration.framenumber)
+			str(self.timecode.duration.framenumber),
+			self._user,
+			self.color.value.title()
 		])
 
 	def __repr__(self) -> str:
