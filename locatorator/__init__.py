@@ -1,5 +1,5 @@
 import typing, enum, re, copy, dataclasses
-from posttools.timecode import Timecode, TimecodeRange
+from timecode import Timecode, TimecodeRange
 
 class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
