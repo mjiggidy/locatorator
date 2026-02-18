@@ -1,4 +1,4 @@
--e git+https://github.com/mjiggidy/posttools.git#egg=posttools
+git+https://github.com/mjiggidy/timecode.git
 PySide6==6.4.2
 PySide6-Addons==6.4.2
 PySide6-Essentials==6.4.2
