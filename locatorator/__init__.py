@@ -201,6 +201,14 @@ class MarkerChangeReport:
 	relative_offset:typing.Optional[Timecode] = None
 	"""Adjusted/relative change between the two lists"""
 
+PAT_VFX_MARKER = re.compile(r"^[a-z]{3}[0-9]{4}", re.IGNORECASE)
+"""ABC1234"""
+
+def is_vfx_marker(marker:Marker) -> bool:
+	"""Filter VFX markers.  For a moment it's hard-coded to format: `ABC1234`"""
+	
+	return bool(PAT_VFX_MARKER.match(marker.comment))
+	
 def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
 	"""Parse a marker list from a file pointer"""
 
@@ -216,7 +224,9 @@ def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
 		# if marker.color != MarkerColors.BLUE:
 		#	continue
 
-		markers.append(marker)
+		# NOTE FOR NOW: Hard coding to ABC1234
+		if is_vfx_marker(marker):
+			markers.append(marker)
 	
 	return markers
 
