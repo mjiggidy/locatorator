@@ -418,7 +418,7 @@ class MainWidget(QtWidgets.QWidget):
 							tc_start=str(marker_change.marker_new.timecode.start),
 							duration=1,
 							track=marker_track,
-							comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.framenumber > 0 else ''}{marker_change.relative_offset})",
+							comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.frame_number > 0 else ''}{marker_change.relative_offset})",
 							user=""
 						)
 

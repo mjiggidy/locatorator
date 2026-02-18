@@ -157,7 +157,7 @@ class Marker:
 			self.track,
 			self.color.value.title() if self.color in CLASSIC_MARKER_SET else "Yellow",
 			self.comment,
-			str(self.timecode.duration.framenumber),
+			str(self.timecode.duration.frame_number),
 			self._user,
 			self.color.value.title()
 		])
@@ -266,7 +266,7 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 			)
 		else:
 			change_report = MarkerChangeReport(
-				change_type = ChangeTypes.CHANGED if relative_offset.framenumber else ChangeTypes.UNCHANGED,
+				change_type = ChangeTypes.CHANGED if relative_offset.frame_number else ChangeTypes.UNCHANGED,
 				marker_old = marker_old,
 				marker_new = marker_new,
 				relative_offset = relative_offset
@@ -311,7 +311,7 @@ def write_change_list(markers_changes:typing.Iterable[MarkerChangeReport], file_
 				tc_start=str(marker_change.marker_new.timecode.start),
 				duration=1,
 				track=marker_track,
-				comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.framenumber > 0 else ''}{marker_change.relative_offset})"
+				comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.frame_number > 0 else ''}{marker_change.relative_offset})"
 			)
 
 		print(marker_output, file=file_output)
