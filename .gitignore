@@ -4,6 +4,8 @@ include/
 lib/
 pyvenv.cfg
 
+.vscode
+
 # testing
 examples/
 changes.txt
