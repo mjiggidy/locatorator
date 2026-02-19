@@ -205,7 +205,7 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 	@QtCore.Slot()
 	def _export_markers(self) -> None:
 		"""Export a given marker list"""
-		self.sig_export_requested.emit(locatorator.MarkerColors(self._cmb_color.currentData()), self._cmb_track.currentText(), self._txt_name.text())
+		self.sig_export_requested.emit(locatorator.MarkerColors(self._cmb_color.currentData()), self._cmb_track.currentText(), self._txt_name.text(), self._change_filters.enabledFilters())
 
 class InputFileChooser(QtWidgets.QWidget):
 	"""Choose an input file"""
@@ -415,33 +415,14 @@ class MainWidget(QtWidgets.QWidget):
 
 		try:
 			with open(path_output, "w") as file_output:
-				for marker_change in self._markerlist:
-					if marker_change.change_type in (locatorator.ChangeTypes.UNCHANGED, locatorator.ChangeTypes.DELETED):
-						continue
-
-					elif marker_change.change_type == locatorator.ChangeTypes.ADDED:
-						marker_output = locatorator.Marker(
-							name=marker_name,
-							color=marker_color,
-							tc_start=str(marker_change.marker_new.timecode.start),
-							duration=1,
-							track=marker_track,
-							comment=f"Shot added: {marker_change.marker_new.comment}",
-							user=""
-						)
-
-					else:
-						marker_output = locatorator.Marker(
-							name=marker_name,
-							color=marker_color,
-							tc_start=str(marker_change.marker_new.timecode.start),
-							duration=1,
-							track=marker_track,
-							comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.frame_number > 0 else ''}{marker_change.relative_offset})",
-							user=""
-						)
-
-					print(marker_output, file=file_output)
+				locatorator.write_change_list(
+					markers_changes=self._markerlist,
+					file_output=file_output,
+					marker_name=marker_name,
+					marker_track=marker_track,
+					marker_color=marker_color,
+					change_types=self._filters.enabledFilters()
+				)
 
 		except Exception as e:
 			QtWidgets.QMessageBox.critical(self, "Error Saving Change List",f"<strong>Cannot save the new marker list:</strong><br/>{e}")
