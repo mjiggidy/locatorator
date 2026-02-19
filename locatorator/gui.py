@@ -550,11 +550,14 @@ class ExportFiltersWidget(QtWidgets.QWidget):
 		self.layout().setContentsMargins(0,0,0,0)
 		self.layout().setSpacing(0)
 
+		settings = QtCore.QSettings()
+
 		self._change_types = {change_type: QtWidgets.QCheckBox() for change_type in locatorator.ChangeTypes}
 
 		for change_type, change_check in self._change_types.items():
 
 			change_check.setText(change_type.name.title())
+			change_check.setChecked(settings.value("filters/" + change_type.name, True, bool))
 			change_check.stateChanged.connect(self.filtersChanged)
 			self.layout().addWidget(change_check)
 	
@@ -564,11 +567,11 @@ class ExportFiltersWidget(QtWidgets.QWidget):
 	
 	@QtCore.Slot()
 	def filtersChanged(self):
-		print(self.enabledFilters())
+		
+		for change_type in locatorator.ChangeTypes:
+			QtCore.QSettings().setValue("filters/" + change_type.name, change_type in self.enabledFilters())
+		
 		self.sig_filters_changed.emit(self.enabledFilters())
-			
-
-
 
 class MainWindow(QtWidgets.QMainWindow):
 	"""Main Program Window"""
