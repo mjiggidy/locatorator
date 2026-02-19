@@ -568,7 +568,7 @@ def main() -> int:
 	app = QtWidgets.QApplication(sys.argv)
 	app.setOrganizationName("GlowingPixel")
 	app.setApplicationName("Locatorator")
-	app.setApplicationVersion("1.2.0")
+	app.setApplicationVersion("1.3.0")
 
 	app.setWindowIcon(QtGui.QPixmap(":/icons/resources/icon.png"))
 
