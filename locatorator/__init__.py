@@ -1,10 +1,25 @@
 import typing, enum, re, copy, dataclasses
 from timecode import Timecode, TimecodeRange
 
+class MarkerListFormats(enum.Enum):
+	"""Marker list formats supported"""
+
+	MARKER_LIST_V1 = enum.auto()
+	MARKER_LIST_V2 = enum.auto()
+
+MarkerListParsers:dict[MarkerListFormats, re.Pattern] = {
+	MarkerListFormats.MARKER_LIST_V1: re.compile(r"^(?P<name>.+?)\t(?P<tc_start>[0-9:;]+?)\t(?P<track>.+?)\t(?P<color>[a-z]+?)\t(?P<comment>.*)\t(?P<duration>[0-9]+?)$", re.IGNORECASE),
+	MarkerListFormats.MARKER_LIST_V2: re.compile(r"^(?P<name>.+?)\t(?P<tc_start>[0-9:;]+?)\t(?P<track>.+?)\t(?P<legacy_color>[a-z]+?)\t(?P<comment>.*)\t(?P<duration>[0-9]+?)\t(?P<user>.*?)\t(?P<color>[a-z]+?)$", re.IGNORECASE)
+}
+"""Regex parsers per supported marker list format"""
+
+PAT_VFX_MARKER = re.compile(r"^[a-z]{2,4}[0-9]{3,4}", re.IGNORECASE)
+"""Pattern for matching a VFX ID marker comment"""
+
 class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
 	
-	# Traditional colors
+	# Legacy colors (Avid 3.0+)
 	RED     = "red"
 	GREEN   = "green"
 	BLUE    = "blue"
@@ -24,7 +39,7 @@ class MarkerColors(enum.Enum):
 	GREY    = "grey"
 	GOLD    = "gold"
 
-CLASSIC_MARKER_SET = {
+LEGACY_MARKER_SET = {
 	MarkerColors.RED,
 	MarkerColors.GREEN,
 	MarkerColors.BLUE,
@@ -34,6 +49,7 @@ CLASSIC_MARKER_SET = {
 	MarkerColors.BLACK,
 	MarkerColors.WHITE,
 }
+"""Legacy marker colors Avid 3.0+"""
 
 EXTENDED_MARKER_SET = {
 	MarkerColors.PINK,
@@ -45,6 +61,7 @@ EXTENDED_MARKER_SET = {
 	MarkerColors.GREY,
 	MarkerColors.GOLD,
 }
+"""Extended marker colors available in Avid 2024.6"""
 
 class ChangeTypes(enum.IntEnum):
 	"""Types of changes between marker lists"""
@@ -120,42 +137,32 @@ class Marker:
 		Duration (frames)
 		"""
 
-		if len(m) == 6:
+		for parser in MarkerListParsers.values():
 
-			return cls(
-				name = m[0],
-				tc_start = m[1],
-				track = m[2],
-				color = str(m[3]).lower(),
-				comment = m[4],
-				duration = int(m[5]),
-				user = ""
-			)
-		
-		elif len(m) == 8:
+			if match := parser.match(line):
 
-			return cls(
-				name = m[0],
-				tc_start = m[1],
-				track = m[2],
-				color = str(m[7]).lower(),
-				comment = m[4],
-				duration = int(m[5]),
-				user = m[6]
-			)
+				return cls(
+					name = match.group("name"),
+					tc_start = match.group("tc_start"),
+					track = match.group("track"),
+					color = match.group("color").lower(),
+					comment = match.group("comment"),
+					duration = match.group("duration"),
+					user = match.group("user") if "user" in match.groupdict() else "",
+				)
 		
 		else:
 			raise ValueError("Unknown marker list format")
 	
 	def __str__(self) -> str:
 
-		# FOR NOW: Always using "new" format
+		# NOTE FOR NOW: Always using "new" format
 		
 		return "\t".join([
 			self.name,
 			str(self.timecode.start),
 			self.track,
-			self.color.value.title() if self.color in CLASSIC_MARKER_SET else "Yellow",
+			self.color.value.title() if self.color in LEGACY_MARKER_SET else "Yellow",
 			self.comment,
 			str(self.timecode.duration.frame_number),
 			self._user,
@@ -186,7 +193,9 @@ class Marker:
 	@classmethod
 	def _sanitize_string(cls, text:str) -> str:
 		"""Don't try anything silly"""
-		return cls._pat_bad_chars.sub("",text).strip()
+
+
+		return str().join(s if str(s).isprintable() else " " for s in  text)
 
 @dataclasses.dataclass
 class MarkerChangeReport:
@@ -201,9 +210,6 @@ class MarkerChangeReport:
 	relative_offset:typing.Optional[Timecode] = None
 	"""Adjusted/relative change between the two lists"""
 
-PAT_VFX_MARKER = re.compile(r"^[a-z]{3}[0-9]{4}", re.IGNORECASE)
-"""ABC1234"""
-
 def is_vfx_marker(marker:Marker) -> bool:
 	"""Filter VFX markers.  For a moment it's hard-coded to format: `ABC1234`"""
 	
@@ -214,7 +220,7 @@ def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
 
 	markers = []
 
-	for idx, line in enumerate(l.rstrip('\n') for l in file_input.readlines()):
+	for idx, line in enumerate(map(lambda l: l.rstrip('\n'), file_input)):
 		try:
 			marker = Marker.from_string(line)
 		except Exception as e:
