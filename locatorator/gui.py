@@ -93,7 +93,7 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 				tc_new,
 				change,
 				str(marker_change.change_type.value)
-			])
+			], marker_change.change_type.value)
 
 			# Align Timecodes right|cener
 			for idx, header in enumerate(self._headerlabels):
@@ -128,11 +128,22 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 		for item in (self.topLevelItem(x) for x in range(max_items)):
 			if item.text(col_framechange) == str(locatorator.ChangeTypes.UNCHANGED.value):
 				item.setHidden(hidden)
+	
+	def setFilters(self, filters:typing.Iterable[locatorator.ChangeTypes]):
+
+		#col_framechange = self._headerlabels.index("Frame Offset")
+
+		filter_values = [f.value for f in filters]
+
+		for item in (self.topLevelItem(x) for x in range(self.topLevelItemCount())):	
+			item.setHidden( item.type() not in filter_values)
+
+
 
 class OutputFileGroup(QtWidgets.QGroupBox):
 	"""Marker list export groupbox"""
 
-	sig_export_requested = QtCore.Signal(locatorator.MarkerColors, str, str)
+	sig_export_requested = QtCore.Signal(locatorator.MarkerColors, str, str, set)
 	"""User has requested an export"""
 
 	sig_export_canceled = QtCore.Signal()
@@ -148,6 +159,8 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 		self._btn_export = QtWidgets.QPushButton()
 		self._txt_name = QtWidgets.QLineEdit()
 
+		self._change_filters = ExportFiltersWidget()
+
 		self._settings = QtCore.QSettings()
 	
 		self._setup()
@@ -155,6 +168,7 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 	def _setup(self): 
 
 		self.setLayout(self._layout)
+		self.layout().setContentsMargins(0,0,0,0)
 		
 		for color in MarkerIcons.icons:
 			self._cmb_color.addItem(MarkerIcons.icons.get(color),"",color)
@@ -181,6 +195,7 @@ class OutputFileGroup(QtWidgets.QGroupBox):
 		self._cmb_track.currentTextChanged.connect(lambda trk: self._settings.setValue("export/markertrack", trk))
 		self._txt_name.editingFinished.connect(lambda: self._settings.setValue("export/markername", self._txt_name.text().strip() or EXPORT_DEFAULT_MARKER_NAME))
 		self._btn_export.clicked.connect(self._export_markers)
+
 
 	@QtCore.Slot()
 	def allow_export(self, allowed:bool):
@@ -341,6 +356,8 @@ class MainWidget(QtWidgets.QWidget):
 
 		self._chk_show_hidden = QtWidgets.QCheckBox()
 
+		self._filters = ExportFiltersWidget()
+
 		self._locked = False
 		self._path_old = pathlib.Path()
 		self._path_new = pathlib.Path()
@@ -355,9 +372,10 @@ class MainWidget(QtWidgets.QWidget):
 		self.setLayout(self._layout)
 		self.layout().addWidget(self._grp_list_inputs)
 		
-		self._chk_show_hidden.setText("Show Non-Changes")
-		self._chk_show_hidden.setCheckState(self._settings.value("viewer/showhidden",QtCore.Qt.CheckState.Unchecked))
-		self.layout().addWidget(self._chk_show_hidden)
+#		self._chk_show_hidden.setText("Show Non-Changes")
+#		self._chk_show_hidden.setCheckState(self._settings.value("viewer/showhidden",QtCore.Qt.CheckState.Unchecked))
+#		self.layout().addWidget(self._chk_show_hidden)
+		self.layout().addWidget(self._filters)
 		self.layout().addWidget(self._tree_viewer)
 		self.layout().addWidget(self._exporter)
 
@@ -366,9 +384,11 @@ class MainWidget(QtWidgets.QWidget):
 		#self._tree_viewer.sig_changes_ready.connect(self.sig_changes_ready)
 		self.sig_changes_ready.connect(self._validate_changes)
 		self.sig_changes_cleared.connect(lambda:self._exporter.allow_export.emit(False))
+
+		self._filters.sig_filters_changed.connect(self._tree_viewer.setFilters)
 		
-		self._chk_show_hidden.stateChanged.connect(lambda show_hidden: self._tree_viewer.hide_non_changes(not show_hidden))
-		self._chk_show_hidden.stateChanged.connect(lambda show_hidden: self._settings.setValue("viewer/showhidden", QtCore.Qt.CheckState(show_hidden)))
+#		self._chk_show_hidden.stateChanged.connect(lambda show_hidden: self._tree_viewer.hide_non_changes(not show_hidden))
+#		self._chk_show_hidden.stateChanged.connect(lambda show_hidden: self._settings.setValue("viewer/showhidden", QtCore.Qt.CheckState(show_hidden)))
 		self._exporter.sig_export_requested.connect(self._save_marker_list)
 	
 	@QtCore.Slot()
@@ -380,7 +400,7 @@ class MainWidget(QtWidgets.QWidget):
 			any(m.change_type in (locatorator.ChangeTypes.CHANGED, locatorator.ChangeTypes.ADDED) for m in self._markerlist)
 		)
 
-		self._tree_viewer.hide_non_changes(not self._chk_show_hidden.checkState().value)
+		self._tree_viewer.setFilters(self._filters.enabledFilters())
 
 		self._changes_loaded = True
 	
@@ -391,7 +411,6 @@ class MainWidget(QtWidgets.QWidget):
 		path_output = QtWidgets.QFileDialog.getSaveFileName(self, "Choose a location to save your markers", dir=self._suggest_output_path(), filter="Marker Lists (*.txt);;All Files (*)")[0]
 		
 		if not path_output:
-#			self.sig_export_canceled.emit()
 			return
 
 		try:
@@ -538,6 +557,38 @@ class AboutWindow(QtWidgets.QDialog):
 
 		self._btn_close.clicked.connect(self.close)
 
+class ExportFiltersWidget(QtWidgets.QWidget):
+
+	sig_filters_changed = QtCore.Signal(set)
+
+	def __init__(self):
+
+		super().__init__()
+
+		self.setLayout(QtWidgets.QHBoxLayout())
+		self.layout().setContentsMargins(0,0,0,0)
+		self.layout().setSpacing(0)
+
+		self._change_types = {change_type: QtWidgets.QCheckBox() for change_type in locatorator.ChangeTypes}
+
+		for change_type, change_check in self._change_types.items():
+
+			change_check.setText(change_type.name.title())
+			change_check.stateChanged.connect(self.filtersChanged)
+			self.layout().addWidget(change_check)
+	
+	def enabledFilters(self) -> set[locatorator.ChangeTypes]:
+
+		return {c for c in self._change_types if self._change_types[c].isChecked()}
+	
+	@QtCore.Slot()
+	def filtersChanged(self):
+		print(self.enabledFilters())
+		self.sig_filters_changed.emit(self.enabledFilters())
+			
+
+
+
 class MainWindow(QtWidgets.QMainWindow):
 	"""Main Program Window"""
 
@@ -569,6 +620,7 @@ def main() -> int:
 	app.setOrganizationName("GlowingPixel")
 	app.setApplicationName("Locatorator")
 	app.setApplicationVersion("1.3.0")
+	
 
 	app.setWindowIcon(QtGui.QPixmap(":/icons/resources/icon.png"))
 
