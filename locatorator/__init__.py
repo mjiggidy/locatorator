@@ -267,8 +267,15 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 
 	# TODO: This still feels like it's doing too much
 
-	marker_lookup_old = build_marker_lookup(markers_old)
-	marker_lookup_new = build_marker_lookup(markers_new)
+	try:
+		marker_lookup_old = build_marker_lookup(markers_old)
+	except ValueError as e:
+		raise ValueError("Old marker list: " + str(e)) from e
+	
+	try:
+		marker_lookup_new = build_marker_lookup(markers_new)
+	except ValueError as e:
+		raise ValueError("New marker list: " + str(e)) from e
 
 	running_offset = Timecode(0) # The total number of frames offset from the beginning
 	marker_pairs = []
