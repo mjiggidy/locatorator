@@ -1,8 +1,12 @@
 import typing, enum, re, copy, dataclasses
 from timecode import Timecode, TimecodeRange
 
-PAT_VFX_MARKER = re.compile(r"^\s*[a-z]{2,4}[0-9]{3,4}", re.IGNORECASE)
+PAT_VFX_MARKER = re.compile(r"^\s*[a-z]{2,4}[0-9]{3,4}(?:[^\sa-z0-9][a-z0-9]+\b)?", re.IGNORECASE)
 """Pattern for matching a VFX ID marker comment"""
+# Support: LF1020
+#          LF1020 and some extraneous stuff
+#          LF1020_pt1
+#          LF1020-pt2 and some extraneous stuff
 
 class MarkerListFormats(enum.Enum):
 	"""Marker list formats supported"""
@@ -15,8 +19,6 @@ MarkerListParsers:dict[MarkerListFormats, re.Pattern] = {
 	MarkerListFormats.MARKER_LIST_V2: re.compile(r"^(?P<name>.+?)\t(?P<tc_start>[0-9:;]+?)\t(?P<track>.+?)\t(?P<legacy_color>[a-z]+?)\t(?P<comment>.*)\t(?P<duration>[0-9]+?)\t(?P<user>.*?)\t(?P<color>[a-z]+?)$", re.IGNORECASE)
 }
 """Regex parsers per supported marker list format"""
-
-
 
 class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
@@ -212,10 +214,12 @@ class MarkerChangeReport:
 	relative_offset:typing.Optional[Timecode] = None
 	"""Adjusted/relative change between the two lists"""
 
-def is_vfx_marker(marker:Marker) -> bool:
-	"""Filter VFX markers.  For a moment it's hard-coded to format: `ABC1234`"""
-	
-	return bool(PAT_VFX_MARKER.match(marker.comment))
+def vfx_id_from_marker(marker:Marker) -> str|None:
+	"""Return the VFX ID found in the marker, or `None`"""
+
+	match = PAT_VFX_MARKER.match(marker.comment)
+
+	return match.group() if match else None
 	
 def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
 	"""Parse a marker list from a file pointer"""
@@ -233,7 +237,7 @@ def get_marker_list_from_file(file_input:typing.TextIO) -> typing.List[Marker]:
 		#	continue
 
 		# NOTE FOR NOW: Hard coding to ABC1234
-		if is_vfx_marker(marker):
+		if vfx_id_from_marker(marker):
 			markers.append(marker)
 	
 	return markers
@@ -247,7 +251,7 @@ def build_marker_lookup(marker_list:typing.Iterable[Marker]) -> dict[str, Marker
 
 		
 		# NOTE: Combine this somehow with is_valid_marker
-		vfx_id = PAT_VFX_MARKER.match(marker.comment).group()
+		vfx_id = vfx_id_from_marker(marker)
 
 		if not vfx_id:
 			raise ValueError(f"VFX ID not found in marker: {marker.comment}")
@@ -264,18 +268,15 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 	# TODO: This still feels like it's doing too much
 
 	marker_lookup_old = build_marker_lookup(markers_old)
+	marker_lookup_new = build_marker_lookup(markers_new)
 
 	running_offset = Timecode(0) # The total number of frames offset from the beginning
 	marker_pairs = []
 
-	for marker_new in markers_new:
-
-		# TODO: Marker export: Change comment should beginwith VFX ID for
-
-		new_vfx_id = PAT_VFX_MARKER.match(marker_new.comment).group()
+	for vfx_id, marker_new in marker_lookup_new.items():
 
 		# TODO: Rework as `if marker_new.comment.lower() not in marker_lookup_old:`?
-		marker_old = marker_lookup_old.get(new_vfx_id)
+		marker_old = marker_lookup_old.get(vfx_id)
 		absolute_offset = marker_new.timecode.start - marker_old.timecode.start if marker_old else 0
 		relative_offset = absolute_offset-running_offset
 
@@ -291,7 +292,7 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 				marker_new = marker_new,
 				relative_offset = relative_offset
 			)
-			del marker_lookup_old[new_vfx_id]
+			del marker_lookup_old[vfx_id]
 
 		if relative_offset != 0:
 			running_offset = absolute_offset
@@ -319,21 +320,18 @@ def write_change_list(markers_changes:typing.Iterable[MarkerChangeReport], file_
 		if marker_change.change_type not in change_types:
 			continue
 
-		
+		vfx_id = vfx_id_from_marker(marker_change.marker_new) if marker_change.change_type == ChangeTypes.ADDED else vfx_id_from_marker(marker_change.marker_old)
+
 		if marker_change.change_type == ChangeTypes.ADDED:
-			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_new.comment).group()
 			comment=f"{vfx_id} - Shot added: {marker_change.marker_new.comment}"
 		
 		elif marker_change.change_type == ChangeTypes.CHANGED:
-			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_old.comment).group()
 			comment=f"{vfx_id} - Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.frame_number > 0 else ''}{marker_change.relative_offset})"
 		
 		elif marker_change.change_type == ChangeTypes.DELETED:
-			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_old.comment).group()
 			comment=f"{vfx_id} - Shot removed since last cut: {marker_change.marker_old.comment}"
 		
 		elif marker_change.change_type == ChangeTypes.UNCHANGED:
-			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_old.comment).group()
 			comment=f"{vfx_id} - Shot unchanged since last cut: {marker_change.marker_old.comment}"
 		
 		else:
