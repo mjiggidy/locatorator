@@ -1,6 +1,7 @@
 from PySide6 import QtWidgets, QtCore, QtGui
 import sys, pathlib, typing
 import locatorator
+from locatorator import PAT_VFX_MARKER
 
 MARKER_COMMENT_COLUMN_NAME = "Shot ID"
 EXPORT_TRACK_OPTIONS = ("TC1","V1","V2","V3","V4","V5","V6","V7","V8")
@@ -61,6 +62,8 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 
 		changelist = []
 
+		font_monospace = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont).family()
+
 		for marker_change in markers_changes:
 			
 			if marker_change.change_type == locatorator.ChangeTypes.DELETED:
@@ -86,14 +89,19 @@ class MarkerViewer(QtWidgets.QTreeWidget):
 				# Add signed positive TC
 				if marker_change.relative_offset > 0:
 					change = "+" + change
-
+			
+			
 			changelist_item = QtWidgets.QTreeWidgetItem([
-				marker_comment,
+				PAT_VFX_MARKER.match(marker_comment).group(),
+				#marker_comment,
 				tc_old,
 				tc_new,
 				change,
 				str(marker_change.change_type.value)
 			], marker_change.change_type.value)
+
+			changelist_item.setFont(1, font_monospace)
+			changelist_item.setFont(2, font_monospace)
 
 			# Align Timecodes right|cener
 			for idx, header in enumerate(self._headerlabels):
