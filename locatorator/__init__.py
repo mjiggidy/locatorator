@@ -1,6 +1,9 @@
 import typing, enum, re, copy, dataclasses
 from timecode import Timecode, TimecodeRange
 
+PAT_VFX_MARKER = re.compile(r"^\s*[a-z]{2,4}[0-9]{3,4}", re.IGNORECASE)
+"""Pattern for matching a VFX ID marker comment"""
+
 class MarkerListFormats(enum.Enum):
 	"""Marker list formats supported"""
 
@@ -13,8 +16,7 @@ MarkerListParsers:dict[MarkerListFormats, re.Pattern] = {
 }
 """Regex parsers per supported marker list format"""
 
-PAT_VFX_MARKER = re.compile(r"^[a-z]{2,4}[0-9]{3,4}", re.IGNORECASE)
-"""Pattern for matching a VFX ID marker comment"""
+
 
 class MarkerColors(enum.Enum):
 	"""Avid marker colors"""
@@ -242,9 +244,17 @@ def build_marker_lookup(marker_list:typing.Iterable[Marker]) -> dict[str, Marker
 	marker_lookup = {}
 	for marker in marker_list:
 		# TODO: Think about shot IDs occurring more than once in a list
-		if marker.comment in marker_lookup:
-			raise ValueError(f"Shot ID \"{marker.comment}\" was found more than once in the same list.")
-		marker_lookup[marker.comment.lower()] = marker
+
+		
+		# NOTE: Combine this somehow with is_valid_marker
+		vfx_id = PAT_VFX_MARKER.match(marker.comment).group()
+
+		if not vfx_id:
+			raise ValueError(f"VFX ID not found in marker: {marker.comment}")
+
+		if vfx_id in marker_lookup:
+			raise ValueError(f"Shot ID \"{vfx_id}\" was found more than once in the same list.")
+		marker_lookup[vfx_id] = marker
 	
 	return marker_lookup
 
@@ -260,8 +270,12 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 
 	for marker_new in markers_new:
 
+		# TODO: Marker export: Change comment should beginwith VFX ID for
+
+		new_vfx_id = PAT_VFX_MARKER.match(marker_new.comment).group()
+
 		# TODO: Rework as `if marker_new.comment.lower() not in marker_lookup_old:`?
-		marker_old = marker_lookup_old.get(marker_new.comment.lower())
+		marker_old = marker_lookup_old.get(new_vfx_id)
 		absolute_offset = marker_new.timecode.start - marker_old.timecode.start if marker_old else 0
 		relative_offset = absolute_offset-running_offset
 
@@ -277,7 +291,7 @@ def build_marker_changes(markers_old:typing.Iterable[Marker], markers_new:typing
 				marker_new = marker_new,
 				relative_offset = relative_offset
 			)
-			del marker_lookup_old[marker_new.comment.lower()]
+			del marker_lookup_old[new_vfx_id]
 
 		if relative_offset != 0:
 			running_offset = absolute_offset
@@ -298,22 +312,29 @@ def write_change_list(markers_changes:typing.Iterable[MarkerChangeReport], file_
 
 	change_types = set(change_types) or {ChangeTypes.ADDED, ChangeTypes.CHANGED, ChangeTypes.DELETED}
 
+
 	for marker_change in markers_changes:
+		
 
 		if marker_change.change_type not in change_types:
 			continue
 
+		
 		if marker_change.change_type == ChangeTypes.ADDED:
-			comment=f"Shot added: {marker_change.marker_new.comment}"
+			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_new.comment).group()
+			comment=f"{vfx_id} - Shot added: {marker_change.marker_new.comment}"
 		
 		elif marker_change.change_type == ChangeTypes.CHANGED:
-			comment=f"Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.frame_number > 0 else ''}{marker_change.relative_offset})"
+			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_old.comment).group()
+			comment=f"{vfx_id} - Cut change near {marker_change.marker_old.comment} ({'+' if marker_change.relative_offset.frame_number > 0 else ''}{marker_change.relative_offset})"
 		
 		elif marker_change.change_type == ChangeTypes.DELETED:
-			comment=f"Shot removed since last cut: {marker_change.marker_old.comment}"
+			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_old.comment).group()
+			comment=f"{vfx_id} - Shot removed since last cut: {marker_change.marker_old.comment}"
 		
 		elif marker_change.change_type == ChangeTypes.UNCHANGED:
-			comment=f"Shot unchanged since last cut: {marker_change.marker_old.comment}"
+			vfx_id = PAT_VFX_MARKER.match(marker_change.marker_old.comment).group()
+			comment=f"{vfx_id} - Shot unchanged since last cut: {marker_change.marker_old.comment}"
 		
 		else:
 			raise ValueError(f"Unknown Change Type: {marker_change.change_type}")
